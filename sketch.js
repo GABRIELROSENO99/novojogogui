@@ -1,6 +1,6 @@
 // =========================================================
 // ROCKET RUN PRO: APOCALIPSE DE ASTEROIDES - JOGO p5.js
-// V2.1 - Design Profissional, Input Corrigido e Foguete Apontando para a Frente
+// V2.2 - Correção de Bug Gráfico (push/pop) e Estilos Isolados
 // =========================================================
 
 // =======================
@@ -26,7 +26,7 @@ let velocidadeJogo = 3;
 let motivoFimDeJogo = "";
 
 // Constantes de Dificuldade
-const FASE_1_DURACAO = 10800; // 3 minutos * 60 FPS * 60 segundos
+const FASE_1_DURACAO = 10800; 
 const VELOCIDADE_FASE_2 = 4.5; 
 const ABERTURA_FASE_2 = 100; 
 
@@ -39,16 +39,15 @@ let estrelas = [];
 
 function setup() {
     let canvas = createCanvas(800, 450);
-    // CRUCIAL: Previne o menu de contexto do botão direito e o comportamento padrão no toque
     canvas.elt.addEventListener('contextmenu', e => e.preventDefault()); 
 
     rocketY = height / 2; 
     combustivel = MAX_COMBUSTIVEL;
     
-    // Configurações de Texto
+    // Configurações de Texto e Estilo Base
     textAlign(CENTER, CENTER);
     textFont('Arial'); 
-    noStroke(); 
+    noStroke(); // Estado base (sem contorno)
     frameRate(60); 
     
     // Inicializa Estrelas
@@ -90,7 +89,7 @@ function draw() {
         // 2. Lógica dos Asteroides
         for (let i = asteroides.length - 1; i >= 0; i--) {
             asteroides[i].mover();
-            asteroides[i].desenhar();
+            asteroides[i].desenhar(); // Agora com isolamento de estilo (push/pop)
 
             if (asteroides[i].checkCollision(50, rocketY, 15)) { 
                 endGame("COLISÃO COM ASTEROIDE!");
@@ -103,7 +102,6 @@ function draw() {
             // LÓGICA DE PONTUAÇÃO E REABASTECIMENTO
             if (asteroides[i].passed && asteroides[i].x < 50 - asteroideLargura / 2) {
                 score++;
-                // RESTABELECE O COMBUSTÍVEL AO MÁXIMO
                 combustivel = MAX_COMBUSTIVEL; 
                 asteroides[i].passed = false; 
             }
@@ -141,7 +139,7 @@ function keyPressed() {
 function touchStarted() {
     if (gameState === 'running') {
         rocketVelocidade = rocketImpulso;
-        return false; // IMPEDE O COMPORTAMENTO PADRÃO DO BROWSER (zoom)
+        return false; // IMPEDE O COMPORTAMENTO PADRÃO DO BROWSER
     }
     
     if (gameState === 'gameover') {
@@ -181,19 +179,23 @@ function restartGame() {
 }
 
 // =========================================================
-// FUNÇÕES DE DESENHO PROFISSIONAIS (ESTÉTICA)
+// FUNÇÕES DE DESENHO PROFISSIONAIS (ESTÉTICA E ISOLAMENTO)
 // =========================================================
 
 function drawBackgroundGradient() {
+    push(); // Salva o estado atual (ex: noStroke)
+    // Fundo com gradiente suave do espaço
     for (let y = 0; y < height; y++) {
         let inter = map(y, 0, height, 0, 1);
         let c = lerpColor(color(10, 0, 20), color(50, 0, 0), inter); 
         stroke(c);
         line(0, y, width, y);
     }
+    pop(); // Restaura o estado (voltando ao noStroke)
 }
 
 function drawStars() {
+    push();
     fill(255);
     for (let i = 0; i < estrelas.length; i++) {
         let star = estrelas[i];
@@ -209,13 +211,17 @@ function drawStars() {
         fill(c); 
         ellipse(star.x, star.y, star.size, star.size);
     }
+    pop();
 }
 
 function drawHUD() {
+    push();
+    // 1. Frase no Topo do Jogo
     textSize(20);
     fill(255, 255, 255); 
     text("Ajude o Guilherme a chegar na casa da Luisa antes do apocalipse", width / 2, 25);
     
+    // 2. Pontuação e Nível de Dificuldade
     textSize(24);
     fill(255, 200, 0); 
     text(`SCORE: ${score}`, width - 100, 60);
@@ -226,18 +232,20 @@ function drawHUD() {
     textSize(18);
     text(`STATUS: ${nivel}`, 100, 60);
     
-    // MEDIDOR DE COMBUSTÍVEL
+    // 3. MEDIDOR DE COMBUSTÍVEL
     drawFuelGauge(40, 90, 15, 200); 
+    pop();
 }
 
 function drawFuelGauge(x, y, h, w) {
+    push();
     fill(255);
     textSize(14);
     text("COMBUSTÍVEL", x + w/2, y - 5);
     
     // Fundo da barra com borda
     fill(50);
-    stroke(255); 
+    stroke(255); // Ativa o contorno para a barra
     strokeWeight(1);
     rect(x, y, w, h, 5); 
     
@@ -253,14 +261,16 @@ function drawFuelGauge(x, y, h, w) {
     }
     
     // Desenha a barra de combustível
-    noStroke();
+    noStroke(); // Desliga o contorno para o preenchimento interno
     fill(fuelColor);
     rect(x + 1, y + 1, fuelWidth - 2, h - 2, 4); 
-    strokeWeight(0);
+    
+    pop(); // Restaura o estado anterior (noStroke)
 }
 
 
 function desenharFoguete(x, y, tamanho) {
+    push();
     let rastroAlpha = map(combustivel, 0, MAX_COMBUSTIVEL, 50, 200); 
     
     // Rastro de Propulsão 
@@ -268,21 +278,23 @@ function desenharFoguete(x, y, tamanho) {
     ellipse(x - tamanho/2 - 5, y, 10 + random(0, 5), 15 + random(0, 10)); 
     
     // Corpo do Foguete com Sombra
+    noStroke();
     fill(100); 
     // Cauda Sup, Cauda Inf, Ponta Nariz (Sombra)
     triangle(x - tamanho/2 + 2, y + tamanho/2 + 2, x - tamanho/2 + 2, y - tamanho/2 + 2, x + tamanho/2 + 2, y + 2); 
     
     fill(180); // Cor principal
-    // CORREÇÃO FINAL: Foguete apontando para a direita
     // Ponto 1: Cauda Superior, Ponto 2: Cauda Inferior, Ponto 3: Ponta do Nariz
     triangle(x - tamanho/2, y - tamanho/2, x - tamanho/2, y + tamanho/2, x + tamanho/2, y); 
     
     // Ponta Vermelha
     fill(200, 50, 50); 
     triangle(x + tamanho/2, y, x + tamanho/2 - 5, y - 5, x + tamanho/2 - 5, y + 5); 
+    pop();
 }
 
 function drawGameOverScreen() {
+    push();
     textSize(60);
     fill(255, 50, 50); 
     text("MISSÃO CRÍTICA FALHOU!", width / 2, height / 2 - 80);
@@ -297,10 +309,11 @@ function drawGameOverScreen() {
     
     textSize(20);
     text("Toque/Clique ou ESPAÇO para Novo Lançamento", width / 2, height / 2 + 80);
+    pop();
 }
 
 // =========================================================
-// CLASSE ASTEROIDE
+// CLASSE ASTEROIDE (COM ISOLAMENTO DE ESTILO)
 // =========================================================
 
 class Asteroide {
@@ -314,8 +327,9 @@ class Asteroide {
     }
 
     desenhar() {
-        // Textura de rocha/fogo
-        stroke(200, 50, 50); 
+        push(); // Isola os estilos de contorno e preenchimento
+        // Usa textura de rocha/fogo
+        stroke(200, 50, 50); // Borda de fogo
         strokeWeight(2);
         
         // Asteroide de Cima
@@ -324,6 +338,7 @@ class Asteroide {
         
         // Asteroide de Baixo
         rect(this.x, this.fundo, asteroideLargura, height - this.fundo);
+        pop(); // Restaura os estilos anteriores
     }
 
     mover() {
