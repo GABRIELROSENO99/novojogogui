@@ -14,7 +14,7 @@ const rocketImpulso = -7;
 // Combustível
 let combustivel;
 const MAX_COMBUSTIVEL = 100;
-const CONSUMO_POR_FRAME = 0.15; // Taxa de consumo por frame
+const CONSUMO_POR_FRAME = 0.15; 
 
 // Obstáculos e Dificuldade
 let asteroides = [];
@@ -26,7 +26,7 @@ let velocidadeJogo = 3;
 let motivoFimDeJogo = "";
 
 // Constantes de Dificuldade
-const FASE_1_DURACAO = 10800; 
+const FASE_1_DURACAO = 10800; // 3 minutos * 60 FPS * 60 segundos
 const VELOCIDADE_FASE_2 = 4.5; 
 const ABERTURA_FASE_2 = 100; 
 
@@ -39,6 +39,7 @@ let estrelas = [];
 
 function setup() {
     let canvas = createCanvas(800, 450);
+    // CRUCIAL: Previne o menu de contexto do botão direito e o comportamento padrão no toque
     canvas.elt.addEventListener('contextmenu', e => e.preventDefault()); 
 
     rocketY = height / 2; 
@@ -89,7 +90,7 @@ function draw() {
         // 2. Lógica dos Asteroides
         for (let i = asteroides.length - 1; i >= 0; i--) {
             asteroides[i].mover();
-            asteroides[i].desenhar(); // Agora com isolamento de estilo (push/pop)
+            asteroides[i].desenhar();
 
             if (asteroides[i].checkCollision(50, rocketY, 15)) { 
                 endGame("COLISÃO COM ASTEROIDE!");
@@ -183,7 +184,7 @@ function restartGame() {
 // =========================================================
 
 function drawBackgroundGradient() {
-    push(); // Salva o estado atual (ex: noStroke)
+    push(); // Inicia isolamento de estilo
     // Fundo com gradiente suave do espaço
     for (let y = 0; y < height; y++) {
         let inter = map(y, 0, height, 0, 1);
@@ -191,7 +192,7 @@ function drawBackgroundGradient() {
         stroke(c);
         line(0, y, width, y);
     }
-    pop(); // Restaura o estado (voltando ao noStroke)
+    pop(); // Restaura o estado anterior (noStroke)
 }
 
 function drawStars() {
@@ -245,7 +246,7 @@ function drawFuelGauge(x, y, h, w) {
     
     // Fundo da barra com borda
     fill(50);
-    stroke(255); // Ativa o contorno para a barra
+    stroke(255); 
     strokeWeight(1);
     rect(x, y, w, h, 5); 
     
@@ -261,11 +262,11 @@ function drawFuelGauge(x, y, h, w) {
     }
     
     // Desenha a barra de combustível
-    noStroke(); // Desliga o contorno para o preenchimento interno
+    noStroke(); 
     fill(fuelColor);
     rect(x + 1, y + 1, fuelWidth - 2, h - 2, 4); 
     
-    pop(); // Restaura o estado anterior (noStroke)
+    pop(); 
 }
 
 
@@ -284,6 +285,7 @@ function desenharFoguete(x, y, tamanho) {
     triangle(x - tamanho/2 + 2, y + tamanho/2 + 2, x - tamanho/2 + 2, y - tamanho/2 + 2, x + tamanho/2 + 2, y + 2); 
     
     fill(180); // Cor principal
+    // Foguete apontando para a direita (CORRIGIDO)
     // Ponto 1: Cauda Superior, Ponto 2: Cauda Inferior, Ponto 3: Ponta do Nariz
     triangle(x - tamanho/2, y - tamanho/2, x - tamanho/2, y + tamanho/2, x + tamanho/2, y); 
     
