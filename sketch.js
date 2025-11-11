@@ -1,6 +1,6 @@
 // =========================================================
 // ROCKET RUN PRO: APOCALIPSE DE ASTEROIDES - JOGO p5.js
-// V3.0 - FINAL: Correções de Bug + Responsividade para Celular
+// V4.0 - FINAL: Modo FÁCIL + Responsividade + Placar de Recordes
 // =========================================================
 
 // =======================
@@ -14,21 +14,27 @@ const rocketImpulso = -7;
 // Combustível
 let combustivel;
 const MAX_COMBUSTIVEL = 100;
-const CONSUMO_POR_FRAME = 0.15; 
+// MODO FÁCIL: CONSUMO REDUZIDO
+const CONSUMO_POR_FRAME = 0.05; 
 
 // Obstáculos e Dificuldade
 let asteroides = [];
-let asteroideAbertura = 120; 
+// MODO FÁCIL: ABERTURA MAIOR
+let asteroideAbertura = 160; 
 let asteroideLargura = 50;
 let score = 0;
 let gameState = 'running'; 
 let velocidadeJogo = 3; 
 let motivoFimDeJogo = "";
 
+// Recordes
+let highScore = 0; 
+
 // Constantes de Dificuldade
 const FASE_1_DURACAO = 10800; 
 const VELOCIDADE_FASE_2 = 4.5; 
-const ABERTURA_FASE_2 = 100; 
+// MODO FÁCIL: ABERTURA NA FASE 2 MAIOR
+const ABERTURA_FASE_2 = 140; 
 
 // Estética
 let estrelas = [];
@@ -38,17 +44,22 @@ let estrelas = [];
 // =========================================================
 
 function setup() {
-    // 1. ALTERAÇÃO CRÍTICA PARA RESPONSIVIDADE:
-    // O canvas terá o tamanho máximo de 800x450, mas será reduzido para caber na janela do navegador.
+    // Responsividade: O canvas terá o tamanho máximo de 800x450, mas será reduzido para caber na janela.
     let w = min(800, windowWidth);
     let h = min(450, windowHeight);
     let canvas = createCanvas(w, h); 
     
-    // CRUCIAL: Previne o menu de contexto do botão direito e o comportamento padrão no toque
+    // Previne o menu de contexto do botão direito e o comportamento padrão no toque
     canvas.elt.addEventListener('contextmenu', e => e.preventDefault()); 
 
-    rocketY = height / 2; // 'height' agora é a altura ajustada
+    rocketY = height / 2; 
     combustivel = MAX_COMBUSTIVEL;
+    
+    // NOVO CÓDIGO: Carrega o recorde salvo (localStorage)
+    let savedScore = localStorage.getItem('rocketRunHighScore');
+    if (savedScore !== null) {
+        highScore = parseInt(savedScore);
+    }
     
     // Configurações de Texto e Estilo Base
     textAlign(CENTER, CENTER);
@@ -65,7 +76,7 @@ function setup() {
 }
 
 function draw() {
-    // 1. Fundo Gradiente e Estrelas 
+    // Fundo Gradiente e Estrelas 
     drawBackgroundGradient(); 
     drawStars(); 
 
@@ -77,7 +88,7 @@ function draw() {
     
     if (gameState === 'running') {
         
-        // 0. GESTÃO DO COMBUSTÍVEL
+        // GESTÃO DO COMBUSTÍVEL
         combustivel -= CONSUMO_POR_FRAME;
         combustivel = constrain(combustivel, 0, MAX_COMBUSTIVEL); 
         
@@ -86,18 +97,17 @@ function draw() {
             return; 
         }
         
-        // 1. Atualiza o Foguete
+        // Atualiza o Foguete
         rocketVelocidade += rocketGravidade;
         rocketY += rocketVelocidade;
         rocketVelocidade = constrain(rocketVelocidade, -12, 8);
         desenharFoguete(50, rocketY, 30);
         
-        // 2. Lógica dos Asteroides
+        // Lógica dos Asteroides
         for (let i = asteroides.length - 1; i >= 0; i--) {
             asteroides[i].mover();
             asteroides[i].desenhar();
 
-            // Note: Os valores de colisão (50, 15) são agora relativos ao novo 'width' e 'height'.
             if (asteroides[i].checkCollision(50, rocketY, 15)) { 
                 endGame("COLISÃO COM ASTEROIDE!");
             }
@@ -134,10 +144,9 @@ function draw() {
 }
 
 // =========================================================
-// FUNÇÃO DE RESPONSIVIDADE CRÍTICA
+// FUNÇÃO DE RESPONSIVIDADE
 // =========================================================
 function windowResized() {
-    // Redimensiona para que o canvas preencha a tela disponível, respeitando o limite máximo
     let w = min(800, windowWidth);
     let h = min(450, windowHeight);
     resizeCanvas(w, h);
@@ -145,7 +154,7 @@ function windowResized() {
 
 
 // =========================================================
-// FUNÇÕES DE INPUT (TOQUE, CLIQUE, TECLA)
+// FUNÇÕES DE INPUT
 // =========================================================
 
 function keyPressed() {
@@ -180,6 +189,13 @@ function mousePressed() {
 function endGame(motivo) {
     motivoFimDeJogo = motivo;
     gameState = 'gameover';
+    
+    // NOVO CÓDIGO: Verifica e salva o novo recorde
+    if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('rocketRunHighScore', highScore);
+    }
+    
     noLoop(); 
 }
 
@@ -190,14 +206,14 @@ function restartGame() {
     score = 0;
     gameState = 'running';
     velocidadeJogo = 3; 
-    asteroideAbertura = 120; 
+    asteroideAbertura = 160; 
     combustivel = MAX_COMBUSTIVEL;
     asteroides.push(new Asteroide());
     loop(); 
 }
 
 // =========================================================
-// FUNÇÕES DE DESENHO PROFISSIONAIS (ESTÉTICA E ISOLAMENTO)
+// FUNÇÕES DE DESENHO E ESTÉTICA
 // =========================================================
 
 function drawBackgroundGradient() {
@@ -233,23 +249,30 @@ function drawStars() {
 
 function drawHUD() {
     push();
-    // 1. Frase no Topo do Jogo
-    textSize(20 * (width / 800)); // Ajusta o tamanho da fonte proporcionalmente
+    // Ajusta o tamanho da fonte e a posição proporcionalmente
+    
+    textSize(20 * (width / 800)); 
     fill(255, 255, 255); 
     text("Ajude o Guilherme a chegar na casa da Luisa antes do apocalipse", width / 2, 25);
     
-    // 2. Pontuação e Nível de Dificuldade
-    textSize(24 * (width / 800)); // Ajusta o tamanho da fonte proporcionalmente
+    // PONTUAÇÃO ATUAL
+    textSize(24 * (width / 800)); 
     fill(255, 200, 0); 
     text(`SCORE: ${score}`, width - 100 * (width / 800), 60);
 
+    // RECORDE
+    textSize(18 * (width / 800));
+    fill(255, 255, 255);
+    text(`RECORD: ${highScore}`, width - 100 * (width / 800), 90); 
+
+    // NÍVEL DE DIFICULDADE
     let nivel = (frameCount > FASE_1_DURACAO) ? "NÍVEL MÉDIO" : "NÍVEL FÁCIL";
     let corNivel = (frameCount > FASE_1_DURACAO) ? color(255, 50, 50) : color(100, 255, 100);
     fill(corNivel);
-    textSize(18 * (width / 800)); // Ajusta o tamanho da fonte proporcionalmente
-    text(`STATUS: ${nivel}`, 100 * (width / 800), 60);
+    textSize(18 * (width / 800)); 
+    text(`STATUS: ${nivel}`, 100 * (width / 800), 60); 
     
-    // 3. MEDIDOR DE COMBUSTÍVEL
+    // MEDIDOR DE COMBUSTÍVEL
     drawFuelGauge(40 * (width / 800), 90, 15, 200 * (width / 800)); 
     pop();
 }
@@ -290,9 +313,6 @@ function desenharFoguete(x, y, tamanho) {
     push();
     let rastroAlpha = map(combustivel, 0, MAX_COMBUSTIVEL, 50, 200); 
     
-    // O tamanho e posição do foguete também devem ser ajustados se o canvas encolher, 
-    // mas o p5.js geralmente cuida disso, mantendo '50' como 50 pixels na escala atual.
-    
     // Rastro de Propulsão 
     fill(255, 100, 0, rastroAlpha); 
     ellipse(x - tamanho/2 - 5, y, 10 + random(0, 5), 15 + random(0, 10)); 
@@ -313,7 +333,8 @@ function desenharFoguete(x, y, tamanho) {
 
 function drawGameOverScreen() {
     push();
-    textSize(60 * (width / 800));
+    // Ajusta o tamanho da fonte proporcionalmente
+    textSize(60 * (width / 800)); 
     fill(255, 50, 50); 
     text("MISSÃO CRÍTICA FALHOU!", width / 2, height / 2 - 80);
     
@@ -321,12 +342,18 @@ function drawGameOverScreen() {
     fill(255, 255, 0);
     text(`Motivo: ${motivoFimDeJogo}`, width / 2, height / 2 - 20);
     
+    // Pontuação Final
     textSize(24 * (width / 800));
     fill(255);
     text(`Pontuação Final: ${score}`, width / 2, height / 2 + 30);
     
+    // NOVO CÓDIGO: Recorde no Game Over
+    textSize(24 * (width / 800));
+    fill(255, 200, 0);
+    text(`RECORDE: ${highScore}`, width / 2, height / 2 + 70);
+
     textSize(20 * (width / 800));
-    text("Toque/Clique ou ESPAÇO para Novo Lançamento", width / 2, height / 2 + 80);
+    text("Toque/Clique ou ESPAÇO para Novo Lançamento", width / 2, height / 2 + 120);
     pop();
 }
 
@@ -354,6 +381,7 @@ class Asteroide {
         rect(this.x, 0, asteroideLargura, this.topo);
         
         // Asteroide de Baixo
+        fill(100, 50, 50);
         rect(this.x, this.fundo, asteroideLargura, height - this.fundo);
         pop(); 
     }
