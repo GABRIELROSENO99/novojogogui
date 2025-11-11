@@ -2,25 +2,30 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0"> 
+    
     <title>Rocket Run PRO - Guilherme e Luisa</title>
     <style>
+        /* CSS ESSENCIAL PARA RESPONSIVIDADE */
         body {
             margin: 0; 
-            overflow: hidden; 
+            overflow: hidden; /* Remove barras de rolagem */
             display: flex; 
             justify-content: center; 
             align-items: center; 
             min-height: 100vh; 
             background-color: #111;
+            /* Se for preciso forçar, adicione este: */
+            touch-action: manipulation; 
+        }
+        
+        /* Garante que o canvas não cause estouro */
+        canvas {
+            display: block;
         }
     </style>
 </head>
 <body>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
-    
-    <script src="sketch.js"></script> 
-    
-</body>
-</html>
+    ...
