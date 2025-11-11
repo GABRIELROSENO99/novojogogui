@@ -7,20 +7,19 @@
     
     <title>Rocket Run PRO - Guilherme e Luisa</title>
     <style>
-        /* CSS ESSENCIAL PARA RESPONSIVIDADE */
+        /* 2. CSS ESSENCIAL PARA CENTRALIZAÇÃO E REMOÇÃO DE BARRAS DE ROLAGEM */
         body {
             margin: 0; 
-            overflow: hidden; /* Remove barras de rolagem */
+            overflow: hidden; /* CRÍTICO: Remove barras de rolagem que causam bugs visuais */
             display: flex; 
-            justify-content: center; 
-            align-items: center; 
+            justify-content: center; /* Centraliza horizontalmente */
+            align-items: center;    /* Centraliza verticalmente */
             min-height: 100vh; 
             background-color: #111;
-            /* Se for preciso forçar, adicione este: */
-            touch-action: manipulation; 
+            touch-action: manipulation; /* Melhora a resposta ao toque em alguns celulares */
         }
         
-        /* Garante que o canvas não cause estouro */
+        /* Garante que o canvas se comporte como um bloco */
         canvas {
             display: block;
         }
@@ -28,4 +27,9 @@
 </head>
 <body>
     
-    ...
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+    
+    <script src="sketch.js"></script> 
+    
+</body>
+</html>
