@@ -1,5 +1,9 @@
+// =========================================================
+// ROCKET RUN: FALHA NA DECOLAGEM - JOGO p5.js COMPLETO
+// =========================================================
+
 // Variáveis do Personagem (o "Foguete")
-let rocketY; // Posição Y (vertical) do Foguete
+let rocketY; 
 let rocketVelocidade = 0;
 const rocketGravidade = 0.4; // Menor gravidade para parecer no espaço
 const rocketImpulso = -7; // Força de propulsão
@@ -12,29 +16,39 @@ let score = 0;
 let gameState = 'running'; // Estados: 'running', 'gameover'
 const velocidadeJogo = 3; // Velocidade de movimento dos asteroides
 
+// =========================================================
+// FUNÇÕES PRINCIPAIS DO P5.JS
+// =========================================================
+
 function setup() {
     // Tela do jogo, maior para parecer mais moderno
     createCanvas(800, 450);
-    rocketY = height / 2; // Começa no meio da tela
+    rocketY = height / 2; 
     
-    // Configurações visuais iniciais
+    // Configurações visuais
     textAlign(CENTER, CENTER);
-    textFont('Arial'); // Tente usar uma fonte mais moderna se for possível
+    textFont('Arial'); 
+    noStroke(); // Remove bordas padrão
     
     // Cria o primeiro obstáculo
     asteroides.push(new Asteroide());
+    
+    // Configura a velocidade de quadros por segundo
+    frameRate(60); 
 }
 
 function draw() {
     // Cenário: Espaço Sideral
     background(0, 0, 30); // Azul escuro do espaço
     
+    // Desenha estrelas de fundo para dar profundidade
+    drawStars();
+    
     if (gameState === 'running') {
-        // 1. Atualiza o Foguete (com propulsão falhando)
+        // 1. Atualiza o Foguete
         rocketVelocidade += rocketGravidade;
         rocketY += rocketVelocidade;
         
-        // Limita a velocidade
         rocketVelocidade = constrain(rocketVelocidade, -12, 8);
 
         // Desenha o Foguete (triângulo com rastro de fogo)
@@ -46,29 +60,28 @@ function draw() {
             asteroides[i].desenhar();
 
             // Checa Colisão
-            if (asteroides[i].checkCollision(50, rocketY, 15)) { // Raio de 15 para colisão
+            if (asteroides[i].checkCollision(50, rocketY, 15)) { 
                 endGame();
             }
 
-            // Remove asteroides que saem da tela
+            // Remoção e Pontuação
             if (asteroides[i].x < -asteroideLargura) {
                 asteroides.splice(i, 1);
             }
             
-            // Lógica de Pontuação
             if (asteroides[i].passed && asteroides[i].x < 50 - asteroideLargura / 2) {
                 score++;
-                asteroides[i].passed = false; // Garante que só pontua uma vez
+                asteroides[i].passed = false; 
             }
         }
 
         // Gera novos asteroides
-        if (frameCount % 80 === 0) { // Gera mais rápido para aumentar a dificuldade
+        if (frameCount % 80 === 0) { 
             asteroides.push(new Asteroide());
         }
 
         // Checa Colisão com os limites da tela (chão/teto)
-        if (rocketY > height - 15 || rocketY < 15) { // 15 é a margem do foguete
+        if (rocketY > height - 15 || rocketY < 15) { 
             endGame();
         }
 
@@ -80,42 +93,46 @@ function draw() {
     } else {
         // Tela de Game Over
         textSize(60);
-        fill(255, 50, 50); // Vermelho de alerta
+        fill(255, 50, 50); 
         text("MISSÃO FALHOU!", width / 2, height / 2 - 30);
         textSize(30);
         fill(255);
         text(`Pontuação Final: ${score}`, width / 2, height / 2 + 30);
         textSize(20);
-        text("Clique ou Aperte ESPAÇO para TENTAR NOVO LANÇAMENTO", width / 2, height / 2 + 80);
+        text("Clique/Toque ou Aperte ESPAÇO para TENTAR NOVO LANÇAMENTO", width / 2, height / 2 + 80);
     }
 }
 
-// Desenha o Foguete (triângulo + fogo)
-function desenharFoguete(x, y, tamanho) {
-    // Rastro de Fogo (Chama)
-    fill(255, 100, 0, 150); // Laranja com transparência
-    ellipse(x - tamanho/2 - 5, y, 10 + random(0, 5), 15 + random(0, 10)); 
-    
-    // Corpo do Foguete (Corpo principal)
-    fill(180); // Cinza
-    triangle(x - tamanho/2, y + tamanho/2, x - tamanho/2, y - tamanho/2, x + tamanho/2, y); 
-    
-    // Detalhe da Ponta
-    fill(200, 50, 50); // Vermelho
-    triangle(x + tamanho/2, y, x + tamanho/2 - 5, y - 5, x + tamanho/2 - 5, y + 5); 
-}
+// =========================================================
+// FUNÇÕES DE INPUT E LÓGICA DE JOGO
+// =========================================================
 
-// Ação de Propulsão (pressionar espaço ou clicar)
+// Função para Pulo (Propulsão) via Barra de Espaço
 function keyPressed() {
     if (key === ' ' && gameState === 'running') {
         rocketVelocidade = rocketImpulso;
     }
 }
 
-function mousePressed() {
+// FUNÇÃO CRUCIAL PARA CORRIGIR DUPLO-CLIQUE/TOQUE NO CELULAR
+function touchStarted() {
+    // Se o jogo estiver rodando, trata o toque como PULO/PROPULSÃO
     if (gameState === 'running') {
-        rocketVelocidade = rocketImpulso; // Propulsão ao clicar
-    } else {
+        rocketVelocidade = rocketImpulso;
+        // ESSENCIAL: Impede que o navegador dispare o evento de mouse logo depois.
+        return false; 
+    }
+    
+    // Se o jogo estiver em Game Over, trata o toque como REINÍCIO
+    if (gameState === 'gameover') {
+        restartGame();
+        return false;
+    }
+}
+
+// Função para Reiniciar o jogo no Game Over (desktop)
+function mousePressed() {
+    if (gameState === 'gameover') {
         restartGame();
     }
 }
@@ -126,7 +143,6 @@ function endGame() {
 }
 
 function restartGame() {
-    // Resetar variáveis
     rocketY = height / 2;
     rocketVelocidade = 0;
     asteroides = [];
@@ -136,12 +152,41 @@ function restartGame() {
     loop(); 
 }
 
-// Classe do Obstáculo (Asteroide)
+// =========================================================
+// FUNÇÕES DE DESENHO (ESTÉTICA)
+// =========================================================
+
+function drawStars() {
+    // Gera um fundo simples de estrelas aleatórias
+    for (let i = 0; i < 100; i++) {
+        fill(255, 255, 255, random(50, 200)); // Estrelas com opacidade variável
+        ellipse(random(width), random(height), random(1, 3), random(1, 3));
+    }
+}
+
+function desenharFoguete(x, y, tamanho) {
+    // Rastro de Fogo (Chama)
+    fill(255, 100, 0, 150); 
+    ellipse(x - tamanho/2 - 5, y, 10 + random(0, 5), 15 + random(0, 10)); 
+    
+    // Corpo do Foguete (Corpo principal)
+    fill(180); 
+    triangle(x - tamanho/2, y + tamanho/2, x - tamanho/2, y - tamanho/2, x + tamanho/2, y); 
+    
+    // Detalhe da Ponta
+    fill(200, 50, 50); 
+    triangle(x + tamanho/2, y, x + tamanho/2 - 5, y - 5, x + tamanho/2 - 5, y + 5); 
+}
+
+// =========================================================
+// CLASSE ASTEROIDE
+// =========================================================
+
 class Asteroide {
     constructor() {
         this.x = width;
-        // Ponto de abertura: Garante que o centro da abertura não esteja muito perto das bordas.
-        this.centroAbertura = random(asteroideAbertura / 2 + 20, height - asteroideAbertura / 2 - 20);
+        // Ponto de abertura: Garante que o centro da passagem não esteja na borda
+        this.centroAbertura = random(asteroideAbertura / 2 + 30, height - asteroideAbertura / 2 - 30);
         this.topo = this.centroAbertura - asteroideAbertura / 2;
         this.fundo = this.centroAbertura + asteroideAbertura / 2;
         this.velocidade = velocidadeJogo; 
@@ -149,10 +194,8 @@ class Asteroide {
     }
 
     desenhar() {
-        fill(100, 100, 100); // Cor de rocha (Cinza)
-        stroke(50); // Borda mais escura
-        strokeWeight(2);
-
+        fill(100, 100, 100); 
+        
         // Asteroide de Cima
         rect(this.x, 0, asteroideLargura, this.topo);
         // Asteroide de Baixo
@@ -163,11 +206,9 @@ class Asteroide {
         this.x -= this.velocidade;
     }
 
-    // Checagem de Colisão (simples)
+    // Checagem de Colisão
     checkCollision(px, py, pr) {
-        // Verifica se o foguete está horizontalmente na linha do asteroide
         if (px + pr > this.x && px - pr < this.x + asteroideLargura) {
-            // Verifica se o foguete está verticalmente acima do asteroide de cima OU abaixo do asteroide de baixo
             if (py - pr < this.topo || py + pr > this.fundo) {
                 return true;
             }
