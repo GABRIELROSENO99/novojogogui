@@ -1,0 +1,152 @@
+// Variáveis do Personagem (o "Pássaro")
+let y; // Posição Y (vertical)
+let velocidade = 0;
+const gravidade = 0.5;
+const impulso = -8; // Força do pulo
+
+// Variáveis do Obstáculo (o "Cano")
+let canos = [];
+const espacamento = 150; // Espaço vertical entre os canos
+const larguraCano = 60;
+let pontuacao = 0;
+let jogoRodando = true;
+
+function setup() {
+    // Cria a tela do jogo (600x400)
+    createCanvas(600, 400); 
+    y = height / 2; // Começa no meio da tela
+    
+    // Cria o primeiro cano
+    canos.push(new Cano());
+}
+
+function draw() {
+    background(0, 150, 200); // Céu azul
+    
+    if (jogoRodando) {
+        // 1. Atualiza o Personagem
+        velocidade += gravidade;
+        y += velocidade;
+        
+        // Limita a velocidade
+        velocidade = constrain(velocidade, -15, 10);
+
+        // Desenha o personagem (um círculo amarelo)
+        fill(255, 200, 0); 
+        ellipse(50, y, 32, 32); 
+
+        // 2. Lógica dos Canos
+        for (let i = canos.length - 1; i >= 0; i--) {
+            canos[i].mover();
+            canos[i].desenhar();
+
+            // Checa Colisão
+            if (canos[i].colide(50, y, 32)) {
+                fimDeJogo();
+            }
+
+            // Remove canos que saem da tela
+            if (canos[i].x < -larguraCano) {
+                canos.splice(i, 1);
+            }
+            
+            // Lógica de Pontuação
+            if (canos[i].passou && canos[i].x < 50) {
+                pontuacao++;
+                canos[i].passou = false; // Garante que só pontua uma vez
+            }
+        }
+
+        // Gera novos canos periodicamente
+        if (frameCount % 100 === 0) {
+            canos.push(new Cano());
+        }
+
+        // Checa Colisão com o chão/teto
+        if (y > height || y < 0) {
+            fimDeJogo();
+        }
+
+        // Mostra a pontuação
+        fill(255);
+        textSize(32);
+        text(pontuacao, width - 50, 40);
+
+    } else {
+        // Tela de Game Over
+        textAlign(CENTER);
+        textSize(50);
+        fill(255, 0, 0);
+        text("GAME OVER!", width / 2, height / 2);
+        textSize(24);
+        fill(255);
+        text(`Pontuação: ${pontuacao}`, width / 2, height / 2 + 50);
+        text("Clique para reiniciar", width / 2, height / 2 + 90);
+    }
+}
+
+// Ação de Pular (pressionar espaço ou clicar)
+function keyPressed() {
+    if (key === ' ' && jogoRodando) {
+        velocidade = impulso;
+    }
+}
+
+function mousePressed() {
+    if (jogoRodando) {
+        velocidade = impulso; // Pulo ao clicar
+    } else {
+        reiniciarJogo();
+    }
+}
+
+function fimDeJogo() {
+    jogoRodando = false;
+    // Sem loop, o p5.js para
+    noLoop(); 
+}
+
+function reiniciarJogo() {
+    // Resetar variáveis
+    y = height / 2;
+    velocidade = 0;
+    canos = [];
+    pontuacao = 0;
+    jogoRodando = true;
+    canos.push(new Cano());
+    loop(); // Reinicia o loop do p5.js
+}
+
+// Classe do Obstáculo (Cano)
+class Cano {
+    constructor() {
+        this.x = width;
+        // Ponto de abertura aleatório
+        this.topo = random(height / 6, 3 / 4 * height);
+        this.fundo = this.topo + espacamento;
+        this.velocidade = 2; // Velocidade de movimento
+        this.passou = true;
+    }
+
+    desenhar() {
+        fill(0, 150, 0); // Cor verde
+        // Cano de cima
+        rect(this.x, 0, larguraCano, this.topo);
+        // Cano de baixo
+        rect(this.x, this.fundo, larguraCano, height - this.fundo);
+    }
+
+    mover() {
+        this.x -= this.velocidade;
+    }
+
+    // Checagem de Colisão (simples, com retângulos e círculo)
+    colide(px, py, pr) {
+        if (px + pr / 2 > this.x && px - pr / 2 < this.x + larguraCano) {
+            if (py - pr / 2 < this.topo || py + pr / 2 > this.fundo) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
