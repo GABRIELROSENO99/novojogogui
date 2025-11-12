@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rocket Run Pro: Seleção de Dificuldade</title>
+    <title>Rocket Run Pro: Mestre do Espaço</title>
     <!-- Carrega a biblioteca P5.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <style>
@@ -65,7 +65,7 @@
         }
 
         /* Cores dos botões */
-        .easy { background-color: #4CAF50; color: white; } /* Verde */
+        .easy { background-color: #00A389; color: white; } /* Verde/Ciano para Ultra Fácil */
         .medium { background-color: #ffc107; color: #333; } /* Amarelo/Laranja */
         .insane { background-color: #F44336; color: white; } /* Vermelho Apocalíptico */
         
@@ -96,7 +96,7 @@
     <div id="menu-screen" class="menu-container">
         <h1>ROCKET RUN PRO</h1>
         <p>SELECIONE O NÍVEL DE DIFICULDADE</p>
-        <button class="difficulty-button easy" onclick="startGame('easy')">FÁCIL</button>
+        <button class="difficulty-button easy" onclick="startGame('easy')">FÁCIL (PILOTO AUTOMÁTICO)</button>
         <button class="difficulty-button medium" onclick="startGame('medium')">MÉDIO</button>
         <button class="difficulty-button insane" onclick="startGame('insane')">ESTOU LOUCO! (INJOGÁVEL)</button>
     </div>
@@ -130,33 +130,87 @@
         let currentDifficulty = 'easy';
         let asteroideLargura = 50;
 
+        // Variáveis para Mensagem Motivacional
+        let messageOverlay = null;
+        let messageTimer = 0;
+        const MESSAGE_DURATION = 180; // 3 segundos (60 frames por segundo)
+
         // Variáveis que MUDAM por DIFICULDADE
         let rocketGravidade;
         let asteroideAbertura; 
         let velocidadeJogo;
         let rocketImpulso;
+
+        // Lista de 40 Mensagens Motivacionais (a cada 25 pontos, até 1000)
+        const MENSAGENS_MOTIVACIONAIS = [
+            "Uau! Você é um ás da pilotagem! Avance para o próximo setor.", // 25
+            "Impecável! Seu histórico de voo é perfeito. Continue assim!", // 50
+            "Setor de Meio de Jogo: Você é imparável. A lenda diz que poucos chegam aqui!", // 75
+            "Meta de 100 atingida! A velocidade da luz não é páreo para você.", // 100
+            "Excelente manobra! Nem um grão de poeira espacial te parou.", // 125
+            "Lenda em formação! O universo inteiro assiste ao seu voo.", // 150
+            "🚀 Modo Turbo Ativado! Continue desviando com essa precisão.", // 175
+            "Dupla Centena! Seu controle é absoluto. Mantenha o curso!", // 200
+            "Pilotagem nível mestre. O próximo desafio espera!", // 225
+            "Um Quarto do Caminho! Incrível! A recompensa está próxima.", // 250
+            "A gravidade obedece a você. Siga em frente, comandante!", // 275
+            "Três Centenas! Você está reescrevendo as regras da física.", // 300
+            "Precisão Absoluta! Seu nome será gravado nas estrelas.", // 325
+            "Que Voo! Você nem parece precisar de combustível.", // 350
+            "Setor Crítico Superado! Nada pode te derrubar agora.", // 375
+            "Quatro Centenas! Você está voando mais rápido que a informação.", // 400
+            "Seu foco é lendário. Continue com essa determinação.", // 425
+            "Mais um salto quântico em sua pontuação! Parabéns!", // 450
+            "Nível de Reflexo: Divino! Mal posso acompanhar sua velocidade.", // 475
+            "MEIO MILHÃO DE PONTOS! (Meio caminho para a glória!)", // 500
+            "Retorno Triunfal! O universo inteiro celebra seu sucesso.", // 525
+            "Maestria Total! Seu foguete parece deslizar no vácuo.", // 550
+            "Nem mesmo um buraco negro ousaria te desafiar. Siga!", // 575
+            "Seis Centenas! Que desempenho monumental.", // 600
+            "Você é um Gênio Tático! Seus movimentos são perfeitos.", // 625
+            "O Painel de Controle está em êxtase com sua performance.", // 650
+            "Onde você aprendeu a voar assim? Absolutamente fabuloso!", // 675
+            "Sete Centenas! A meta está logo ali, à vista!", // 700
+            "Próximo Nível de Consciência: Você é a própria estrela.", // 725
+            "Três Quartos do Caminho! A perseverança compensa.", // 750
+            "Lançamento Bem Sucedido! Prepare-se para o final épico.", // 775
+            "Oito Centenas! Os Deuses da Astrologia estão impressionados.", // 800
+            "Você está em outra dimensão de pilotagem. Continue a magia!", // 825
+            "Última Barreira de Setor! Você consegue ver o final?", // 850
+            "Recorde de Velocidade Quebrado! Apenas você e o infinito.", // 875
+            "Nove Centenas! Faltam apenas 100 para a Lenda!", // 900
+            "Você está respirando no espaço com facilidade! Quase lá!", // 925
+            "O Céu Não É o Limite! Continue ultrapassando expectativas.", // 950
+            "PRÓXIMA PARADA: GLÓRIA! Apenas mais um passo...", // 975
+            "🌟 NÍVEL LENDÁRIO ATINGIDO! Você é o MESTRE DO ESPAÇO! 🌟" // 1000
+        ];
+
+
         const DIFICULDADE_CONFIG = {
             'easy': {
-                grav: 0.2, // Queda suave (baseado na sua correção)
-                abert: 160,
-                veloc: 3,
-                impuls: -7,
-                maxVeloc: 5, // Limite de queda
+                grav: 0.1, // Gravidade quase zero
+                abert: 200, // Abertura gigantesca
+                veloc: 2, // Velocidade muito lenta
+                impuls: -5,
+                maxVeloc: 3, // Limite de queda mínimo
+                autoAlignRate: 0.025, // Taxa de alinhamento suave
             },
             'medium': {
-                grav: 0.4, // Gravidade padrão
-                abert: 140, // Abertura menor
-                veloc: 4, // Mais rápido
+                grav: 0.4, 
+                abert: 140,
+                veloc: 4,
                 impuls: -7,
                 maxVeloc: 8,
+                autoAlignRate: 0,
             },
-            // MODO INSANO: Quase injogável
+            // MODO INSANO: Quase injogável, como solicitado
             'insane': {
                 grav: 0.8, // Gravidade PESADÍSSIMA
                 abert: 100, // Abertura minúscula
                 veloc: 7, // VELOCIDADE MÁXIMA
-                impuls: -9, // Impulso precisa ser mais forte para compensar a gravidade
+                impuls: -9, // Impulso forte para tentar compensar
                 maxVeloc: 15, // Queda terminal muito rápida
+                autoAlignRate: 0,
             }
         };
 
@@ -222,6 +276,7 @@
             combustivel = MAX_COMBUSTIVEL;
             asteroides.push(new Asteroide());
             gameState = 'running';
+            messageOverlay = null; // Limpa qualquer mensagem pendente
 
             // Oculta o menu e mostra o canvas
             document.getElementById('menu-screen').classList.add('hidden');
@@ -254,7 +309,355 @@
                     return; 
                 }
                 
-                // Atualiza o Foguete
+                // Atualiza o Foguete (Gravidade e Velocidade)
                 rocketVelocidade += rocketGravidade;
                 rocketY += rocketVelocidade;
-                //
+                // Usa o limite de velocidade baseado na dificuldade
+                rocketVelocidade = constrain(rocketVelocidade, -12, DIFICULDADE_CONFIG[currentDifficulty].maxVeloc);
+
+                // --- NOVO: Lógica de Auto-Alinhamento para o MODO FÁCIL ---
+                if (currentDifficulty === 'easy' && asteroides.length > 0) {
+                    // Alvo é o centro da abertura do próximo asteroide
+                    let targetY = asteroides[0].centroAbertura;
+                    
+                    // Suaviza a posição do foguete (lerp) para alinhar-se ao alvo
+                    // A taxa 0.025 é bem lenta e suave, difícil de notar
+                    let rate = DIFICULDADE_CONFIG['easy'].autoAlignRate;
+                    rocketY = lerp(rocketY, targetY, rate); 
+
+                    // Garante que o foguete não saia da tela durante o alinhamento
+                    rocketY = constrain(rocketY, 15, height - 15);
+                }
+                // --- Fim do Auto-Alinhamento ---
+
+                desenharFoguete(50, rocketY, 30);
+                
+                // Lógica dos Asteroides
+                for (let i = asteroides.length - 1; i >= 0; i--) {
+                    asteroides[i].mover();
+                    asteroides[i].desenhar();
+
+                    if (asteroides[i].checkCollision(50, rocketY, 15)) { 
+                        endGame("COLISÃO COM ASTEROIDE!");
+                    }
+
+                    if (asteroides[i].x < -asteroideLargura) {
+                        asteroides.splice(i, 1);
+                    }
+                    
+                    // LÓGICA DE PONTUAÇÃO E MENSAGENS MOTIVACIONAIS
+                    if (asteroides[i].passed && asteroides[i].x < 50 - asteroideLargura / 2) {
+                        score++;
+                        combustivel = MAX_COMBUSTIVEL; 
+                        asteroides[i].passed = false; 
+
+                        // NOVO: Lógica de Mensagens Motivacionais (a cada 25 pontos)
+                        if (currentDifficulty === 'easy' && score > 0 && score % 25 === 0 && score <= 1000) {
+                            let index = (score / 25) - 1;
+                            if (index < MENSAGENS_MOTIVACIONAIS.length) {
+                                messageOverlay = MENSAGENS_MOTIVACIONAIS[index];
+                                messageTimer = MESSAGE_DURATION;
+                            }
+                        }
+                    }
+                }
+
+                // Gera novos asteroides
+                if (frameCount % 80 === 0) { 
+                    asteroides.push(new Asteroide());
+                }
+
+                // Checa Colisão com os limites da tela
+                if (rocketY > height - 15 || rocketY < 15) { 
+                    endGame("SAIU DA ROTA!");
+                }
+
+                // Mostra o HUD Principal
+                drawHUD();
+
+            } else if (gameState === 'gameover') {
+                 // Redesenha a última posição do foguete antes de parar
+                desenharFoguete(50, rocketY, 30);
+                 drawHUD();
+            }
+
+            // NOVO: Exibe a mensagem de motivação, se houver
+            if (messageOverlay !== null) {
+                drawMessageOverlay();
+            }
+        }
+
+        // =========================================================
+        // FUNÇÕES DE RESPONSIVIDADE
+        // =========================================================
+        function windowResized() {
+            let w = min(800, windowWidth);
+            let h = min(450, windowHeight);
+            resizeCanvas(w, h);
+            // Re-centraliza o menu/gameover
+            let canvas = select('canvas');
+            if (canvas) {
+                canvas.elt.style.left = `${(windowWidth - w) / 2}px`;
+                canvas.elt.style.top = `${(windowHeight - h) / 2}px`;
+            }
+        }
+
+
+        // =========================================================
+        // FUNÇÕES DE INPUT
+        // =========================================================
+
+        function keyPressed() {
+            if (key === ' ' && gameState === 'running') {
+                rocketVelocidade = rocketImpulso;
+            }
+            // No modo gameover, o ESPAÇO volta para o menu
+            if (key === ' ' && gameState === 'gameover') {
+                showMenu();
+            }
+        }
+
+        function touchStarted() {
+            if (gameState === 'running') {
+                rocketVelocidade = rocketImpulso;
+                return false; 
+            }
+            // No modo gameover, o toque volta para o menu
+            if (gameState === 'gameover') {
+                showMenu();
+                return false;
+            }
+        }
+
+        function mousePressed() {
+            if (gameState === 'running') {
+                rocketVelocidade = rocketImpulso;
+            }
+        }
+
+        // =========================================================
+        // FUNÇÕES DE JOGO E SOBREPOSIÇÃO
+        // =========================================================
+
+        function endGame(motivo) {
+            motivoFimDeJogo = motivo;
+            gameState = 'gameover';
+            
+            // Verifica e salva o novo recorde
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('rocketRunHighScore', highScore);
+            }
+            
+            noLoop(); // Para o loop do P5
+
+            // Exibe a tela de Game Over HTML
+            document.getElementById('gameover-reason').innerText = motivoFimDeJogo;
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('high-score').innerText = highScore;
+            document.getElementById('gameover-screen').classList.remove('hidden');
+        }
+
+        function drawMessageOverlay() {
+            if (messageTimer > 0) {
+                push();
+                let alpha = 255;
+                // Efeitos de Fade In e Fade Out
+                if (messageTimer < 60) { 
+                    alpha = map(messageTimer, 0, 60, 0, 255);
+                } else if (messageTimer > MESSAGE_DURATION - 60) {
+                    alpha = map(messageTimer, MESSAGE_DURATION - 60, MESSAGE_DURATION, 0, 255);
+                }
+
+                // Fundo da mensagem
+                fill(0, 0, 0, 200);
+                rect(0, height / 2 - 50, width, 100);
+
+                // Texto da Mensagem
+                textSize(28 * (width / 800));
+                fill(255, 200, 0, alpha); // Cor do texto motivacional
+                text(messageOverlay, width / 2, height / 2);
+                
+                messageTimer--;
+                if (messageTimer <= 0) {
+                    messageOverlay = null; // Remove a mensagem
+                }
+                pop();
+            }
+        }
+
+        // =========================================================
+        // FUNÇÕES DE DESENHO E ESTÉTICA
+        // =========================================================
+
+        function drawBackgroundGradient() {
+            push(); 
+            for (let y = 0; y < height; y++) {
+                let inter = map(y, 0, height, 0, 1);
+                // Gradiente escuro/vermelho
+                let c = lerpColor(color(10, 0, 20), color(50, 0, 0), inter); 
+                stroke(c);
+                line(0, y, width, y);
+            }
+            pop(); 
+        }
+
+        function drawStars() {
+            push();
+            fill(255);
+            for (let i = 0; i < estrelas.length; i++) {
+                let star = estrelas[i];
+                
+                // Velocidade das estrelas baseada na velocidade do jogo
+                star.x -= star.speed * velocidadeJogo * 0.5; 
+                
+                if (star.x < 0) {
+                    star.x = width;
+                    star.y = random(height);
+                }
+                
+                let c = (i % 5 === 0) ? color(255, 255, 255) : color(255, 100, 0, 150);
+                fill(c); 
+                ellipse(star.x, star.y, star.size, star.size);
+            }
+            pop();
+        }
+
+        function drawHUD() {
+            push();
+            // Título
+            textSize(20 * (width / 800)); 
+            fill(255, 255, 255); 
+            text("FOGUETE EM FUGA: ROTA DE SOBREVIVÊNCIA", width / 2, 25);
+            
+            // PONTUAÇÃO ATUAL
+            textSize(24 * (width / 800)); 
+            fill(255, 200, 0); 
+            text(`SCORE: ${score}`, width - 100 * (width / 800), 60);
+
+            // RECORDE
+            textSize(18 * (width / 800));
+            fill(255, 255, 255);
+            text(`RECORD: ${highScore}`, width - 100 * (width / 800), 90); 
+
+            // NÍVEL DE DIFICULDADE ATUAL
+            let nivel = currentDifficulty.toUpperCase();
+            let corNivel;
+            if (currentDifficulty === 'easy') {
+                 corNivel = color(100, 255, 100);
+            } else if (currentDifficulty === 'medium') {
+                corNivel = color(255, 255, 0);
+            } else {
+                 corNivel = color(255, 50, 50); // Insano
+            }
+
+            fill(corNivel);
+            textSize(18 * (width / 800)); 
+            text(`MODO: ${nivel}`, 100 * (width / 800), 60); 
+            
+            // MEDIDOR DE COMBUSTÍVEL
+            drawFuelGauge(40 * (width / 800), 90, 15, 200 * (width / 800)); 
+            pop();
+        }
+
+        function drawFuelGauge(x, y, h, w) {
+            push();
+            textSize(14 * (width / 800));
+            fill(255);
+            text("COMBUSTÍVEL", x + w/2, y - 5);
+            
+            // Fundo da barra com borda
+            fill(50);
+            stroke(255); 
+            strokeWeight(1);
+            rect(x, y, w, h, 5); 
+            
+            let fuelWidth = map(combustivel, 0, MAX_COMBUSTIVEL, 0, w);
+            
+            let fuelColor;
+            if (combustivel < 20) {
+                fuelColor = color(255, 0, 0); 
+            } else if (combustivel < 50) {
+                fuelColor = color(255, 255, 0); 
+            } else {
+                fuelColor = color(0, 200, 0); 
+            }
+            
+            // Desenha a barra de combustível
+            noStroke(); 
+            fill(fuelColor);
+            rect(x + 1, y + 1, fuelWidth - 2, h - 2, 4); 
+            
+            pop(); 
+        }
+
+
+        function desenharFoguete(x, y, tamanho) {
+            push();
+            let rastroAlpha = map(combustivel, 0, MAX_COMBUSTIVEL, 50, 200); 
+            
+            // Rastro de Propulsão 
+            fill(255, 100, 0, rastroAlpha); 
+            ellipse(x - tamanho/2 - 5, y, 10 + random(0, 5), 15 + random(0, 10)); 
+            
+            // Corpo do Foguete com Sombra
+            noStroke();
+            fill(100); 
+            triangle(x - tamanho/2 + 2, y + tamanho/2 + 2, x - tamanho/2 + 2, y - tamanho/2 + 2, x + tamanho/2 + 2, y + 2); 
+            
+            fill(180); // Cor principal
+            triangle(x - tamanho/2, y - tamanho/2, x - tamanho/2, y + tamanho/2, x + tamanho/2, y); 
+            
+            // Ponta Vermelha
+            fill(200, 50, 50); 
+            triangle(x + tamanho/2, y, x + tamanho/2 - 5, y - 5, x + tamanho/2 - 5, y + 5); 
+            pop();
+        }
+
+        // =========================================================
+        // CLASSE ASTEROIDE
+        // =========================================================
+
+        class Asteroide {
+            constructor() {
+                this.x = width;
+                // Usa asteroideAbertura global
+                this.centroAbertura = random(asteroideAbertura / 2 + 30, height - asteroideAbertura / 2 - 30);
+                this.topo = this.centroAbertura - asteroideAbertura / 2;
+                this.fundo = this.centroAbertura + asteroideAbertura / 2;
+                // Usa velocidadeJogo global
+                this.velocidade = velocidadeJogo; 
+                this.passed = true;
+            }
+
+            desenhar() {
+                push(); 
+                stroke(200, 50, 50); 
+                strokeWeight(2);
+                
+                // Asteroide de Cima
+                fill(100, 50, 50); 
+                rect(this.x, 0, asteroideLargura, this.topo);
+                
+                // Asteroide de Baixo
+                fill(100, 50, 50);
+                rect(this.x, this.fundo, asteroideLargura, height - this.fundo);
+                pop(); 
+            }
+
+            mover() {
+                this.x -= velocidadeJogo;
+            }
+
+            checkCollision(px, py, pr) {
+                if (px + pr > this.x && px - pr < this.x + asteroideLargura) {
+                    if (py - pr < this.topo || py + pr > this.fundo) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+    </script>
+</body>
+</html>
