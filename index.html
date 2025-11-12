@@ -1,28 +1,260 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
-    <meta charset="utf-8">
-    
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0"> 
-    
-    <title>Rocket Run PRO - Guilherme e Luisa</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rocket Run Pro: Seleção de Dificuldade</title>
+    <!-- Carrega a biblioteca P5.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <style>
+        /* Estilos básicos para centralizar o canvas e torná-lo responsivo */
         body {
-            margin: 0; 
-            overflow: hidden; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            min-height: 100vh; 
-            background-color: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #0a0014;
+            font-family: Arial, sans-serif;
+            color: white;
+            overflow: hidden; /* Evita barras de rolagem desnecessárias */
+        }
+        canvas {
+            display: block;
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(255, 50, 50, 0.5); /* Efeito neon vermelho */
+            cursor: pointer;
+        }
+
+        /* Estilos para o menu de dificuldade e Game Over (Usados por elementos HTML invisíveis) */
+        .menu-container, .game-over-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 30px;
+            background: rgba(0, 0, 0, 0.85);
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+            text-align: center;
+            z-index: 100; /* Garante que fique acima do canvas */
+        }
+
+        .menu-container h1, .game-over-container h1 {
+            color: #ff9900;
+            margin-bottom: 25px;
+            font-size: 2.5rem;
+        }
+
+        .difficulty-button, .restart-button {
+            display: block;
+            width: 250px;
+            padding: 15px 20px;
+            margin: 15px auto;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .difficulty-button:hover, .restart-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Cores dos botões */
+        .easy { background-color: #4CAF50; color: white; } /* Verde */
+        .medium { background-color: #ffc107; color: #333; } /* Amarelo/Laranja */
+        .insane { background-color: #F44336; color: white; } /* Vermelho Apocalíptico */
+        
+        /* Estilos para tela de Game Over */
+        .game-over-container h2 {
+            color: #F44336;
+            margin: 15px 0;
+            font-size: 1.8rem;
+        }
+        .score-display {
+            font-size: 1.4rem;
+            color: #ccc;
+            margin-bottom: 20px;
+        }
+        .score-display span {
+            color: #ffc107;
+            font-size: 1.8rem;
+            font-weight: bold;
+        }
+        .hidden {
+            display: none;
         }
     </style>
 </head>
 <body>
+
+    <!-- Novo Menu de Dificuldade (Inicialmente visível) -->
+    <div id="menu-screen" class="menu-container">
+        <h1>ROCKET RUN PRO</h1>
+        <p>SELECIONE O NÍVEL DE DIFICULDADE</p>
+        <button class="difficulty-button easy" onclick="startGame('easy')">FÁCIL</button>
+        <button class="difficulty-button medium" onclick="startGame('medium')">MÉDIO</button>
+        <button class="difficulty-button insane" onclick="startGame('insane')">ESTOU LOUCO! (INJOGÁVEL)</button>
+    </div>
+
+    <!-- Tela de Game Over (Inicialmente oculta) -->
+    <div id="gameover-screen" class="game-over-container hidden">
+        <h1>MISSÃO FALHOU</h1>
+        <h2 id="gameover-reason"></h2>
+        <div class="score-display">
+            Pontuação: <span id="final-score">0</span>
+        </div>
+        <div class="score-display">
+            Recorde: <span id="high-score">0</span>
+        </div>
+        <button class="restart-button easy" onclick="showMenu()">REINICIAR</button>
+    </div>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
-    
-    <script src="sketch.js"></script> 
-    
-</body>
-</html>
+    <script>
+        // Global
+        let rocketY; 
+        let rocketVelocidade = 0;
+        let combustivel;
+        const MAX_COMBUSTIVEL = 100;
+        const CONSUMO_POR_FRAME = 0.05;
+        let asteroides = [];
+        let score = 0;
+        let gameState = 'menu'; // Novo estado inicial
+        let motivoFimDeJogo = "";
+        let highScore = 0;
+        let estrelas = [];
+        let currentDifficulty = 'easy';
+        let asteroideLargura = 50;
+
+        // Variáveis que MUDAM por DIFICULDADE
+        let rocketGravidade;
+        let asteroideAbertura; 
+        let velocidadeJogo;
+        let rocketImpulso;
+        const DIFICULDADE_CONFIG = {
+            'easy': {
+                grav: 0.2, // Queda suave (baseado na sua correção)
+                abert: 160,
+                veloc: 3,
+                impuls: -7,
+                maxVeloc: 5, // Limite de queda
+            },
+            'medium': {
+                grav: 0.4, // Gravidade padrão
+                abert: 140, // Abertura menor
+                veloc: 4, // Mais rápido
+                impuls: -7,
+                maxVeloc: 8,
+            },
+            // MODO INSANO: Quase injogável
+            'insane': {
+                grav: 0.8, // Gravidade PESADÍSSIMA
+                abert: 100, // Abertura minúscula
+                veloc: 7, // VELOCIDADE MÁXIMA
+                impuls: -9, // Impulso precisa ser mais forte para compensar a gravidade
+                maxVeloc: 15, // Queda terminal muito rápida
+            }
+        };
+
+        // =========================================================
+        // FUNÇÕES DE SETUP E MENU
+        // =========================================================
+
+        function setup() {
+            // Responsividade: O canvas terá o tamanho máximo de 800x450, mas será reduzido para caber na janela.
+            let w = min(800, windowWidth);
+            let h = min(450, windowHeight);
+            let canvas = createCanvas(w, h); 
+            canvas.parent(document.body); // Coloca o canvas no corpo do documento
+            
+            // Previne o menu de contexto do botão direito e o comportamento padrão no toque
+            canvas.elt.addEventListener('contextmenu', e => e.preventDefault()); 
+
+            // Carrega o recorde salvo (localStorage)
+            let savedScore = localStorage.getItem('rocketRunHighScore');
+            if (savedScore !== null) {
+                highScore = parseInt(savedScore);
+            }
+            
+            // Configurações de Texto e Estilo Base
+            textAlign(CENTER, CENTER);
+            textFont('Arial'); 
+            noStroke(); 
+            frameRate(60); 
+            
+            // Inicializa Estrelas
+            for(let i = 0; i < 150; i++) {
+                estrelas.push({ x: random(width), y: random(height), size: random(1, 3), speed: random(0.5, 2) });
+            }
+            
+            // Oculta o canvas ao iniciar para mostrar o menu
+            canvas.elt.style.display = 'none';
+        }
+
+        function showMenu() {
+            gameState = 'menu';
+            document.getElementById('menu-screen').classList.remove('hidden');
+            document.getElementById('gameover-screen').classList.add('hidden');
+            let canvas = select('canvas');
+            if (canvas) canvas.elt.style.display = 'none';
+        }
+
+        function startGame(difficulty) {
+            currentDifficulty = difficulty;
+            const config = DIFICULDADE_CONFIG[difficulty];
+
+            // Aplica as configurações de dificuldade
+            rocketGravidade = config.grav;
+            asteroideAbertura = config.abert;
+            velocidadeJogo = config.veloc;
+            rocketImpulso = config.impuls;
+            rocketMaxVeloc = config.maxVeloc;
+            
+            // Inicializa estado de jogo
+            rocketY = height / 2;
+            rocketVelocidade = 0;
+            asteroides = [];
+            score = 0;
+            combustivel = MAX_COMBUSTIVEL;
+            asteroides.push(new Asteroide());
+            gameState = 'running';
+
+            // Oculta o menu e mostra o canvas
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('gameover-screen').classList.add('hidden');
+            let canvas = select('canvas');
+            if (canvas) canvas.elt.style.display = 'block';
+
+            loop();
+        }
+
+        function draw() {
+            // Se estiver no menu, não desenha nada além do fundo
+            if (gameState === 'menu') {
+                 drawBackgroundGradient(); 
+                 drawStars();
+                 return; // Sai do draw()
+            }
+            
+            drawBackgroundGradient(); 
+            drawStars(); 
+            
+            if (gameState === 'running') {
+                
+                // GESTÃO DO COMBUSTÍVEL
+                combustivel -= CONSUMO_POR_FRAME;
+                combustivel = constrain(combustivel, 0, MAX_COMBUSTIVEL); 
+                
+                if (combustivel <= 0) {
+                    endGame("ACABOU O COMBUSTÍVEL!");
+                    return; 
+                }
+                
+                // Atualiza o Foguete
+                rocketVelocidade += rocketGravidade;
+                rocketY += rocketVelocidade;
+                //
