@@ -88,6 +88,15 @@
         .hidden {
             display: none;
         }
+
+        /* Estilo para instrução de controle */
+        #controls-instruction {
+            position: absolute;
+            bottom: 20px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+            z-index: 10;
+        }
     </style>
 </head>
 <body>
@@ -113,11 +122,17 @@
         </div>
         <button class="restart-button easy" onclick="showMenu()">REINICIAR</button>
     </div>
+
+    <div id="controls-instruction">
+        Controles: WASD ou SETAS (Mover), Clique/Toque/ESPAÇO (Impulso Extra Contínuo)
+    </div>
     
     <script>
         // Global
+        let rocketX;
         let rocketY; 
-        let rocketVelocidade = 0;
+        let rocketXVel = 0;
+        let rocketYVel = 0;
         let combustivel;
         const MAX_COMBUSTIVEL = 100;
         const CONSUMO_POR_FRAME = 0.05;
@@ -130,16 +145,29 @@
         let currentDifficulty = 'easy';
         let asteroideLargura = 50;
 
+        // NOVO: Estado para controle de clique/toque (Impulso Extra Contínuo)
+        let isBoostActive = false; 
+
         // Variáveis para Mensagem Motivacional
         let messageOverlay = null;
         let messageTimer = 0;
         const MESSAGE_DURATION = 180; // 3 segundos (60 frames por segundo)
+        let keys = {}; // Estado das teclas pressionadas
+
+        // Variáveis para Autopilot (Assistência Invisível - EASY mode)
+        let lastActionTime = 0; 
+        let autoPilotActive = false;
+        const AUTOPILOT_DELAY = 120; // 2 segundos * 60 FPS (para ativar o autopilot)
+
 
         // Variáveis que MUDAM por DIFICULDADE
-        let rocketGravidade;
+        let gravidade;
         let asteroideAbertura; 
-        let velocidadeJogo;
-        let rocketImpulso;
+        let velocidadeJogo; // Velocidade de rolagem do mundo
+        let y_thrust;
+        let x_thrust;
+        let max_speed;
+        let drag; // Fricção
 
         // Lista de 40 Mensagens Motivacionais (a cada 25 pontos, até 1000)
         const MENSAGENS_MOTIVACIONAIS = [
@@ -188,29 +216,32 @@
 
         const DIFICULDADE_CONFIG = {
             'easy': {
-                grav: 0.1, // Gravidade quase zero
+                grav: 0.1, // Gravidade (empurra para baixo)
                 abert: 200, // Abertura gigantesca
-                veloc: 2, // Velocidade muito lenta
-                impuls: -5,
-                maxVeloc: 3, // Limite de queda mínimo
-                autoAlignRate: 0.025, // Taxa de alinhamento suave
+                y_thrust: -0.7, // Impulso vertical (WASD Y)
+                x_thrust: 0.5, // Impulso horizontal (WASD X)
+                max_speed: 4, // Velocidade máxima (horizontal e vertical)
+                scroll_base: 2, // Velocidade base do mundo
+                drag: 0.98, // Fricção (mais perto de 1, menos fricção)
             },
             'medium': {
                 grav: 0.4, 
                 abert: 140,
-                veloc: 4,
-                impuls: -7,
-                maxVeloc: 8,
-                autoAlignRate: 0,
+                y_thrust: -1.0,
+                x_thrust: 0.8,
+                max_speed: 6,
+                scroll_base: 4,
+                drag: 0.97,
             },
             // MODO INSANO: Quase injogável, como solicitado
             'insane': {
                 grav: 0.8, // Gravidade PESADÍSSIMA
                 abert: 100, // Abertura minúscula
-                veloc: 7, // VELOCIDADE MÁXIMA
-                impuls: -9, // Impulso forte para tentar compensar
-                maxVeloc: 15, // Queda terminal muito rápida
-                autoAlignRate: 0,
+                y_thrust: -1.3,
+                x_thrust: 1.2,
+                max_speed: 8,
+                scroll_base: 7,
+                drag: 0.96, // Menos fricção = mais difícil de parar
             }
         };
 
@@ -253,6 +284,7 @@
             gameState = 'menu';
             document.getElementById('menu-screen').classList.remove('hidden');
             document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('controls-instruction').classList.remove('hidden');
             let canvas = select('canvas');
             if (canvas) canvas.elt.style.display = 'none';
         }
@@ -262,25 +294,35 @@
             const config = DIFICULDADE_CONFIG[difficulty];
 
             // Aplica as configurações de dificuldade
-            rocketGravidade = config.grav;
+            gravidade = config.grav;
             asteroideAbertura = config.abert;
-            velocidadeJogo = config.veloc;
-            rocketImpulso = config.impuls;
-            rocketMaxVeloc = config.maxVeloc;
+            y_thrust = config.y_thrust;
+            x_thrust = config.x_thrust;
+            max_speed = config.max_speed;
+            drag = config.drag;
             
             // Inicializa estado de jogo
+            rocketX = width / 4; // Começa mais à esquerda
             rocketY = height / 2;
-            rocketVelocidade = 0;
+            rocketXVel = 0;
+            rocketYVel = 0;
             asteroides = [];
             score = 0;
             combustivel = MAX_COMBUSTIVEL;
             asteroides.push(new Asteroide());
             gameState = 'running';
             messageOverlay = null; // Limpa qualquer mensagem pendente
+            keys = {}; // Limpa o estado das teclas
+            isBoostActive = false; // Garante que o boost por clique/toque comece desligado
+
+            // Autopilot Reset: Começa com o autopilot desligado, mas o timer zerado
+            lastActionTime = frameCount; 
+            autoPilotActive = false;
 
             // Oculta o menu e mostra o canvas
             document.getElementById('menu-screen').classList.add('hidden');
             document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('controls-instruction').classList.add('hidden');
             let canvas = select('canvas');
             if (canvas) canvas.elt.style.display = 'block';
 
@@ -299,9 +341,93 @@
             drawStars(); 
             
             if (gameState === 'running') {
+
+                // --- 1. APLICAÇÃO DOS CONTROLES (FORÇAS) ---
+
+                // Checa a condição de Impulso Extra (4x mais forte)
+                // Se ESPAÇO (32) OU Clique/Toque (isBoostActive) estiver ativo
+                const highBoostCondition = (keys[' '] || keys[32] || isBoostActive);
+
+                if (highBoostCondition) {
+                    // Impulso extra contínuo (mais forte)
+                    rocketYVel += y_thrust * 4.0;
+                } else if (keys['w'] || keys['W'] || keys['ArrowUp']) {
+                    // Impulso padrão (mais fraco) se o boost não estiver ativo
+                    rocketYVel += y_thrust;
+                }
+
+                // Vertical (Baixo ou Seta para Baixo)
+                if (keys['s'] || keys['S'] || keys['ArrowDown']) {
+                    rocketYVel -= y_thrust * 0.5; // Menor impulso para baixo
+                }
+
+                // Horizontal (Frente/Trás ou D/A)
+                let rightThrustApplied = false;
+                if (keys['d'] || keys['D'] || keys['ArrowRight']) {
+                    rocketXVel += x_thrust;
+                    rightThrustApplied = true;
+                }
+                if (keys['a'] || keys['A'] || keys['ArrowLeft']) {
+                    rocketXVel -= x_thrust;
+                }
                 
+                // Variável para checar se o jogador está fazendo QUALQUER coisa
+                let anyPlayerAction = (keys['w'] || keys['W'] || keys['ArrowUp'] || keys['s'] || keys['S'] || keys['ArrowDown'] || keys['a'] || keys['A'] || rightThrustApplied || highBoostCondition);
+
+
+                // --- LÓGICA DO PILOTO AUTOMÁTICO (Assistência Invisível) ---
+                if (currentDifficulty === 'easy') {
+                    
+                    if (anyPlayerAction) {
+                        // 1. Reseta o Timer e Desativa o Autopilot em qualquer ação ativa do jogador.
+                        autoPilotActive = false;
+                        lastActionTime = frameCount;
+                    } else {
+                        // 2. Nenhuma ação: Tenta Ativar o Autopilot após o delay (2 segundos)
+                        if (frameCount > lastActionTime + AUTOPILOT_DELAY) {
+                            autoPilotActive = true;
+                        }
+                    }
+
+                    // 3. Aplica o Impulso Automático se estiver ativo
+                    if (autoPilotActive) {
+                        // Aplica um impulso constante para a direita, suave (20% do impulso normal)
+                        rocketXVel += x_thrust * 0.2; 
+                    }
+                }
+
+                // --- 2. FÍSICA E ATUALIZAÇÃO DE VELOCIDADE ---
+                
+                // Aplica Gravidade (para baixo)
+                rocketYVel += gravidade;
+
+                // Aplica Fricção (Drag)
+                rocketXVel *= drag;
+                rocketYVel *= drag;
+
+                // Limita a Velocidade Máxima
+                rocketXVel = constrain(rocketXVel, -max_speed, max_speed);
+                rocketYVel = constrain(rocketYVel, -max_speed, max_speed);
+                
+                // Atualiza Posição
+                rocketX += rocketXVel;
+                rocketY += rocketYVel;
+
+                // Restringe o Foguete aos Limites da Tela (Borda dura)
+                rocketX = constrain(rocketX, 15, width - 15);
+                rocketY = constrain(rocketY, 15, height - 15);
+                
+                // --- 3. MOVIMENTO DO MUNDO (Velocidade de Rolagem) ---
+                
+                // A velocidade do jogo (rolagem) depende da posição horizontal do foguete (quanto mais à direita, mais rápido)
+                let xFactor = map(rocketX, width / 4, width - 15, 0, 1.5); // Acelera se estiver mais à direita
+                velocidadeJogo = DIFICULDADE_CONFIG[currentDifficulty].scroll_base + xFactor;
+
                 // GESTÃO DO COMBUSTÍVEL
-                combustivel -= CONSUMO_POR_FRAME;
+                // Consome mais combustível se estiver usando impulso
+                let currentConsumption = CONSUMO_POR_FRAME * (anyPlayerAction ? 2 : 1);
+
+                combustivel -= currentConsumption;
                 combustivel = constrain(combustivel, 0, MAX_COMBUSTIVEL); 
                 
                 if (combustivel <= 0) {
@@ -309,35 +435,15 @@
                     return; 
                 }
                 
-                // Atualiza o Foguete (Gravidade e Velocidade)
-                rocketVelocidade += rocketGravidade;
-                rocketY += rocketVelocidade;
-                // Usa o limite de velocidade baseado na dificuldade
-                rocketVelocidade = constrain(rocketVelocidade, -12, DIFICULDADE_CONFIG[currentDifficulty].maxVeloc);
+                // --- 4. LÓGICA DE ASTEROIDES E COLISÃO ---
 
-                // --- NOVO: Lógica de Auto-Alinhamento para o MODO FÁCIL ---
-                if (currentDifficulty === 'easy' && asteroides.length > 0) {
-                    // Alvo é o centro da abertura do próximo asteroide
-                    let targetY = asteroides[0].centroAbertura;
-                    
-                    // Suaviza a posição do foguete (lerp) para alinhar-se ao alvo
-                    // A taxa 0.025 é bem lenta e suave, difícil de notar
-                    let rate = DIFICULDADE_CONFIG['easy'].autoAlignRate;
-                    rocketY = lerp(rocketY, targetY, rate); 
-
-                    // Garante que o foguete não saia da tela durante o alinhamento
-                    rocketY = constrain(rocketY, 15, height - 15);
-                }
-                // --- Fim do Auto-Alinhamento ---
-
-                desenharFoguete(50, rocketY, 30);
+                desenharFoguete(rocketX, rocketY, 30);
                 
-                // Lógica dos Asteroides
                 for (let i = asteroides.length - 1; i >= 0; i--) {
-                    asteroides[i].mover();
+                    asteroides[i].mover(velocidadeJogo); // Move com a nova velocidade
                     asteroides[i].desenhar();
 
-                    if (asteroides[i].checkCollision(50, rocketY, 15)) { 
+                    if (asteroides[i].checkCollision(rocketX, rocketY, 15)) { 
                         endGame("COLISÃO COM ASTEROIDE!");
                     }
 
@@ -345,14 +451,14 @@
                         asteroides.splice(i, 1);
                     }
                     
-                    // LÓGICA DE PONTUAÇÃO E MENSAGENS MOTIVACIONAIS
-                    if (asteroides[i].passed && asteroides[i].x < 50 - asteroideLargura / 2) {
-                        score++;
-                        combustivel = MAX_COMBUSTIVEL; 
-                        asteroides[i].passed = false; 
-
-                        // NOVO: Lógica de Mensagens Motivacionais (a cada 25 pontos)
-                        if (currentDifficulty === 'easy' && score > 0 && score % 25 === 0 && score <= 1000) {
+                    // LÓGICA DE PONTUAÇÃO (CORRIGIDA PARA 1 PONTO POR BARREIRA)
+                    if (!asteroides[i].scored && rocketX > asteroides[i].x + asteroideLargura) {
+                        score++; // AGORA SIM: APENAS 1 PONTO POR OBSTÁCULO ULTRAPASSADO.
+                        combustivel = MAX_COMBUSTIVEL; // Recarrega
+                        asteroides[i].scored = true; // Marca como pontuado
+                        
+                        // Lógica de Mensagens Motivacionais (a cada 25 pontos)
+                        if (score > 0 && score % 25 === 0 && score <= 1000) {
                             let index = (score / 25) - 1;
                             if (index < MENSAGENS_MOTIVACIONAIS.length) {
                                 messageOverlay = MENSAGENS_MOTIVACIONAIS[index];
@@ -362,14 +468,11 @@
                     }
                 }
 
-                // Gera novos asteroides
-                if (frameCount % 80 === 0) { 
+                // Gera novos asteroides (ajustado para a nova velocidade de rolagem)
+                // O tempo de geração deve ser inversamente proporcional à velocidade do jogo
+                let spawnInterval = max(30, 100 - (velocidadeJogo * 5)); // Mínimo de 30 frames
+                if (frameCount % floor(spawnInterval) === 0) { 
                     asteroides.push(new Asteroide());
-                }
-
-                // Checa Colisão com os limites da tela
-                if (rocketY > height - 15 || rocketY < 15) { 
-                    endGame("SAIU DA ROTA!");
                 }
 
                 // Mostra o HUD Principal
@@ -377,18 +480,75 @@
 
             } else if (gameState === 'gameover') {
                  // Redesenha a última posição do foguete antes de parar
-                desenharFoguete(50, rocketY, 30);
+                desenharFoguete(rocketX, rocketY, 30);
                  drawHUD();
             }
 
-            // NOVO: Exibe a mensagem de motivação, se houver
+            // Exibe a mensagem de motivação, se houver
             if (messageOverlay !== null) {
                 drawMessageOverlay();
             }
         }
 
         // =========================================================
-        // FUNÇÕES DE RESPONSIVIDADE
+        // FUNÇÕES DE INPUT (CORRIGIDAS PARA CONTROLE CONTÍNUO)
+        // =========================================================
+
+        function keyPressed() {
+            if (gameState === 'running') {
+                keys[key] = true;
+                keys[keyCode] = true; // Para setas e ESPAÇO (32)
+            } else if (gameState === 'gameover' && (key === ' ' || keyCode === 32)) {
+                // Se estiver em gameover, espaço retorna ao menu
+                showMenu();
+            }
+        }
+
+        function keyReleased() {
+            if (gameState === 'running') {
+                keys[key] = false;
+                keys[keyCode] = false;
+            }
+        }
+        
+        // --- EVENTOS DE MOUSE/TOQUE ---
+
+        function mousePressed() {
+            if (gameState === 'running') {
+                isBoostActive = true; // Inicia o impulso contínuo
+            }
+             // Retorna ao menu se estiver em gameover, no clique
+            if (gameState === 'gameover') {
+                showMenu();
+            }
+        }
+
+        function mouseReleased() {
+            if (gameState === 'running') {
+                isBoostActive = false; // Para o impulso contínuo
+            }
+        }
+        
+        function touchStarted() {
+            if (gameState === 'running') {
+                isBoostActive = true; // Inicia o impulso contínuo
+            }
+            // Retorna ao menu se estiver em gameover, no toque
+            if (gameState === 'gameover') {
+                showMenu();
+            }
+            return false; 
+        }
+
+        function touchEnded() {
+             if (gameState === 'running') {
+                isBoostActive = false; // Para o impulso contínuo
+            }
+        }
+
+
+        // =========================================================
+        // FUNÇÕES DE RESPONSIVIDADE (inalteradas)
         // =========================================================
         function windowResized() {
             let w = min(800, windowWidth);
@@ -399,39 +559,6 @@
             if (canvas) {
                 canvas.elt.style.left = `${(windowWidth - w) / 2}px`;
                 canvas.elt.style.top = `${(windowHeight - h) / 2}px`;
-            }
-        }
-
-
-        // =========================================================
-        // FUNÇÕES DE INPUT
-        // =========================================================
-
-        function keyPressed() {
-            if (key === ' ' && gameState === 'running') {
-                rocketVelocidade = rocketImpulso;
-            }
-            // No modo gameover, o ESPAÇO volta para o menu
-            if (key === ' ' && gameState === 'gameover') {
-                showMenu();
-            }
-        }
-
-        function touchStarted() {
-            if (gameState === 'running') {
-                rocketVelocidade = rocketImpulso;
-                return false; 
-            }
-            // No modo gameover, o toque volta para o menu
-            if (gameState === 'gameover') {
-                showMenu();
-                return false;
-            }
-        }
-
-        function mousePressed() {
-            if (gameState === 'running') {
-                rocketVelocidade = rocketImpulso;
             }
         }
 
@@ -557,6 +684,12 @@
             
             // MEDIDOR DE COMBUSTÍVEL
             drawFuelGauge(40 * (width / 800), 90, 15, 200 * (width / 800)); 
+
+            // VELOCIDADE DO MUNDO
+            textSize(14 * (width / 800));
+            fill(200, 200, 255);
+            text(`VELOCIDADE: ${nf(velocidadeJogo, 1, 1)}`, 100 * (width / 800), 115);
+
             pop();
         }
 
@@ -591,26 +724,47 @@
             pop(); 
         }
 
-
         function desenharFoguete(x, y, tamanho) {
             push();
-            let rastroAlpha = map(combustivel, 0, MAX_COMBUSTIVEL, 50, 200); 
             
-            // Rastro de Propulsão 
-            fill(255, 100, 0, rastroAlpha); 
-            ellipse(x - tamanho/2 - 5, y, 10 + random(0, 5), 15 + random(0, 10)); 
+            let rastroAlpha = map(combustivel, 0, MAX_COMBUSTIVEL, 50, 255);
+            let trailLength = map(rocketYVel, -max_speed, max_speed, 10, 20); // Rastro maior ao cair
+            
+            // --- CÁLCULO DA ROTAÇÃO (Pitch) ---
+            // Gira o foguete para dar uma sensação de direção vertical
+            let rotationAngle = map(rocketYVel, -max_speed, max_speed, radians(-20), radians(20));
+            
+            translate(x, y);
+            rotate(rotationAngle);
+            
+            // Rastro de Propulsão (Baseado no Y, para dar a sensação de impulso para cima)
+            if (rocketYVel < 0 || keys['w'] || keys['W'] || keys['ArrowUp'] || isBoostActive || keys[' '] || keys[32]) {
+                fill(255, 150, 0, rastroAlpha); 
+                ellipse(-tamanho/2 - 5, 0, 10 + random(0, 5), 15 + random(0, 10)); 
+            }
+            
+            // Rastro Lateral (Baseado no X, para dar a sensação de impulso lateral)
+            if (keys['a'] || keys['A'] || keys['ArrowLeft']) {
+                fill(0, 200, 255, rastroAlpha * 0.5); // Azul para freio
+                rect(tamanho/2 - 5, -tamanho/2, 5, tamanho);
+            } else if (keys['d'] || keys['D'] || keys['ArrowRight'] || (currentDifficulty === 'easy' && autoPilotActive)) {
+                 fill(255, 100, 0, rastroAlpha * 0.5); // Laranja para aceleração (inclui Autopilot no rastro)
+                rect(-tamanho/2 - 5, -tamanho/2, 5, tamanho);
+            }
+            
             
             // Corpo do Foguete com Sombra
             noStroke();
             fill(100); 
-            triangle(x - tamanho/2 + 2, y + tamanho/2 + 2, x - tamanho/2 + 2, y - tamanho/2 + 2, x + tamanho/2 + 2, y + 2); 
+            triangle(-tamanho/2 + 2, tamanho/2 + 2, -tamanho/2 + 2, -tamanho/2 + 2, tamanho/2 + 2, 2); 
             
             fill(180); // Cor principal
-            triangle(x - tamanho/2, y - tamanho/2, x - tamanho/2, y + tamanho/2, x + tamanho/2, y); 
+            triangle(-tamanho/2, -tamanho/2, -tamanho/2, tamanho/2, tamanho/2, 0); 
             
             // Ponta Vermelha
             fill(200, 50, 50); 
-            triangle(x + tamanho/2, y, x + tamanho/2 - 5, y - 5, x + tamanho/2 - 5, y + 5); 
+            triangle(tamanho/2, 0, tamanho/2 - 5, -5, tamanho/2 - 5, 5); 
+            
             pop();
         }
 
@@ -625,9 +779,7 @@
                 this.centroAbertura = random(asteroideAbertura / 2 + 30, height - asteroideAbertura / 2 - 30);
                 this.topo = this.centroAbertura - asteroideAbertura / 2;
                 this.fundo = this.centroAbertura + asteroideAbertura / 2;
-                // Usa velocidadeJogo global
-                this.velocidade = velocidadeJogo; 
-                this.passed = true;
+                this.scored = false; // AGORA SÓ HÁ PONTUAÇÃO SE ESTIVER 'false'
             }
 
             desenhar() {
@@ -645,11 +797,13 @@
                 pop(); 
             }
 
-            mover() {
-                this.x -= velocidadeJogo;
+            mover(scrollSpeed) {
+                // Move o asteroide para a esquerda com base na velocidade de rolagem
+                this.x -= scrollSpeed;
             }
 
             checkCollision(px, py, pr) {
+                // Checa colisão da caixa delimitadora do foguete (pr)
                 if (px + pr > this.x && px - pr < this.x + asteroideLargura) {
                     if (py - pr < this.topo || py + pr > this.fundo) {
                         return true;
