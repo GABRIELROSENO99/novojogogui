@@ -1,854 +1,838 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rocket Run Pro: Mestre do Espaço</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
-    <style>
-        /* Estilos básicos para centralizar o canvas e torná-lo responsivo (MANTIDO) */
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            background-color: #0a0014;
-            font-family: Arial, sans-serif;
-            color: white;
-            overflow: hidden; /* Evita barras de rolagem desnecessárias */
-            /* IMPORTANTE: Adiciona 'position: relative' ao body para posicionar os botões */
-            position: relative;
-            /* CORREÇÃO CRÍTICA: Desativa o zoom e a rolagem no nível do body */
-            touch-action: manipulation;
-        }
-        canvas {
-            display: block;
-            border-radius: 12px;
-            box-shadow: 0 0 30px rgba(255, 50, 50, 0.5); /* Efeito neon vermelho */
-            cursor: pointer;
-        }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rocket Run Pro: Mestre do Espaço</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        /* Estilos básicos para centralizar o canvas e torná-lo responsivo */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #0a0014;
+            font-family: Arial, sans-serif;
+            color: white;
+            overflow: hidden; /* Evita barras de rolagem desnecessárias */
+        }
+        canvas {
+            display: block;
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(255, 50, 50, 0.5); /* Efeito neon vermelho */
+            cursor: pointer;
+        }
 
-        /* Estilos do Menu e Game Over (MANTIDO) */
-        .menu-container, .game-over-container {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            padding: 30px;
-            background: rgba(0, 0, 0, 0.85);
-            border-radius: 15px;
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
-            text-align: center;
-            z-index: 100;
-        }
+        /* Estilos para o menu de dificuldade e Game Over (Usados por elementos HTML invisíveis) */
+        .menu-container, .game-over-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 30px;
+            background: rgba(0, 0, 0, 0.85);
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+            text-align: center;
+            z-index: 100; /* Garante que fique acima do canvas */
+        }
 
-        .menu-container h1, .game-over-container h1 { color: #ff9900; margin-bottom: 25px; font-size: 2.5rem; }
-        .difficulty-button, .restart-button { display: block; width: 250px; padding: 15px 20px; margin: 15px auto; border: none; border-radius: 8px; font-size: 1.2rem; font-weight: bold; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
-        .difficulty-button:hover, .restart-button:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3); }
-        .easy { background-color: #00A389; color: white; }
-        .medium { background-color: #ffc107; color: #333; }
-        .insane { background-color: #F44336; color: white; }
-        .game-over-container h2 { color: #F44336; margin: 15px 0; font-size: 1.8rem; }
-        .score-display { font-size: 1.4rem; color: #ccc; margin-bottom: 20px; }
-        .score-display span { color: #ffc107; font-size: 1.8rem; font-weight: bold; }
-        .hidden { display: none; }
-        #controls-instruction {
-            position: absolute;
-            bottom: 5px; /* Mais para baixo para não cobrir o D-Pad */
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.8rem; /* Menor para economizar espaço */
-            z-index: 10;
-        }
+        .menu-container h1, .game-over-container h1 {
+            color: #ff9900;
+            margin-bottom: 25px;
+            font-size: 2.5rem;
+        }
 
-        /* NOVO: Estilos para o D-Pad (Controles Móveis) */
-        #mobile-controls {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            z-index: 20; /* Fica acima de tudo */
-            display: none; /* Inicialmente oculto. Exibido apenas no jogo */
-        }
+        .difficulty-button, .restart-button {
+            display: block;
+            width: 250px;
+            padding: 15px 20px;
+            margin: 15px auto;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
 
-        .control-button {
-            width: 55px;
-            height: 55px;
-            margin: 5px;
-            border: 3px solid #ff9900;
-            border-radius: 50%;
-            background-color: rgba(255, 153, 0, 0.3);
-            color: white;
-            font-size: 1.5rem;
-            font-weight: bold;
-            text-align: center;
-            line-height: 50px;
-            user-select: none; /* Evita seleção de texto no toque */
-            touch-action: manipulation; /* CORREÇÃO: Essencial para evitar zoom/rolagem apenas nos botões */
-            cursor: pointer;
-            transition: background-color 0.1s;
-        }
+        .difficulty-button:hover, .restart-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3);
+        }
 
-        .control-button:active {
-            background-color: rgba(255, 153, 0, 0.8);
-            box-shadow: 0 0 10px #ff9900;
-        }
+        /* Cores dos botões */
+        .easy { background-color: #00A389; color: white; } /* Verde/Ciano para Ultra Fácil */
+        .medium { background-color: #ffc107; color: #333; } /* Amarelo/Laranja */
+        .insane { background-color: #F44336; color: white; } /* Vermelho Apocalíptico */
+        
+        /* Estilos para tela de Game Over */
+        .game-over-container h2 {
+            color: #F44336;
+            margin: 15px 0;
+            font-size: 1.8rem;
+        }
+        .score-display {
+            font-size: 1.4rem;
+            color: #ccc;
+            margin-bottom: 20px;
+        }
+        .score-display span {
+            color: #ffc107;
+            font-size: 1.8rem;
+            font-weight: bold;
+        }
+        .hidden {
+            display: none;
+        }
 
-        #left-button { float: left; }
-        #right-button { float: left; margin-left: 0; } /* Alinha com o botão 'left' */
-        #up-button { clear: both; margin: 5px auto; display: block; width: 125px; border-radius: 8px; height: 35px; line-height: 30px; font-size: 1.2rem; }
-
-        /* NOVO: Classe para forçar a exibição do D-Pad */
-        .show-mobile-controls { display: block !important; }
-
-    </style>
+        /* Estilo para instrução de controle */
+        #controls-instruction {
+            position: absolute;
+            bottom: 20px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+            z-index: 10;
+        }
+    </style>
 </head>
 <body>
 
-    <div id="menu-screen" class="menu-container">
-        <h1>ROCKET RUN PRO</h1>
-        <p>SELECIONE O NÍVEL DE DIFICULDADE</p>
-        <button class="difficulty-button easy" onclick="startGame('easy')">FÁCIL</button>
-        <button class="difficulty-button medium" onclick="startGame('medium')">MÉDIO</button>
-        <button class="difficulty-button insane" onclick="startGame('insane')">ESTOU LOUCO (só para loucos)</button>
-    </div>
-
-    <div id="gameover-screen" class="game-over-container hidden">
-        <h1>MISSÃO FALHOU</h1>
-        <h2 id="gameover-reason"></h2>
-        <div class="score-display">
-            Pontuação: <span id="final-score">0</span>
-        </div>
-        <div class="score-display">
-            Recorde: <span id="high-score">0</span>
-        </div>
-        <button class="restart-button easy" onclick="showMenu()">REINICIAR</button>
-    </div>
-
-    <div id="controls-instruction">
-        Controles PC: WASD ou SETAS (Mover), Clique/ESPAÇO (Impulso Extra). Controles Celular: D-Pad (Mover), Toque (Impulso Extra Contínuo).
-    </div>
-
-    <div id="mobile-controls">
-        <div id="up-button" class="control-button"
-            ontouchstart="controlButtonDown('w'); return false;" ontouchend="controlButtonUp('w'); return false;"
-            onmousedown="controlButtonDown('w')" onmouseup="controlButtonUp('w')">
-            PROPULSOR
-        </div>
-        <div>
-            <div id="left-button" class="control-button"
-                ontouchstart="controlButtonDown('a'); return false;" ontouchend="controlButtonUp('a'); return false;"
-                onmousedown="controlButtonDown('a')" onmouseup="controlButtonUp('a')">
-                &#9664;
-            </div>
-            <div id="right-button" class="control-button"
-                ontouchstart="controlButtonDown('d'); return false;" ontouchend="controlButtonUp('d'); return false;"
-                onmousedown="controlButtonDown('d')" onmouseup="controlButtonUp('d')">
-                &#9654;
-            </div>
-        </div>
-
-    </div>
-    <script>
-        // Global (MANTIDO)
-        let rocketX;
-        let rocketY;
-        let rocketXVel = 0;
-        let rocketYVel = 0;
-        let combustivel;
-        const MAX_COMBUSTIVEL = 100;
-        const CONSUMO_POR_FRAME = 0.05;
-        let asteroides = [];
-        let score = 0;
-        let gameState = 'menu';
-        let motivoFimDeJogo = "";
-        let highScore = 0;
-        let estrelas = [];
-        let currentDifficulty = 'easy';
-        let asteroideLargura = 50;
-
-        // NOVO: Estado para controle de clique/toque (Impulso Extra Contínuo)
-        let isBoostActive = false;
-
-        // Variáveis para Mensagem Motivacional
-        let messageOverlay = null;
-        let messageTimer = 0;
-        const MESSAGE_DURATION = 180;
-        let keys = {}; // Estado das teclas pressionadas (usado também pelos botões virtuais)
-
-        // Variáveis para Autopilot (Assistência Invisível - EASY mode)
-        let lastActionTime = 0;
-        let autoPilotActive = false;
-        const AUTOPILOT_DELAY = 120;
-
-        // Variáveis que MUDAM por DIFICULDADE (MANTIDO)
-        let gravidade;
-        let asteroideAbertura;
-        let velocidadeJogo;
-        let y_thrust;
-        let x_thrust;
-        let max_speed;
-        let drag;
-
-        // Lista de 40 Mensagens Motivacionais (MANTIDO)
-        const MENSAGENS_MOTIVACIONAIS = [
-            "Uau! Você é um ás da pilotagem! Avance para o próximo setor.",
-            "Impecável! Seu histórico de voo é perfeito. Continue assim!",
-            "Setor de Meio de Jogo: Você é imparável. A lenda diz que poucos chegam aqui!",
-            "Meta de 100 atingida! A velocidade da luz não é páreo para você.",
-            "Excelente manobra! Nem um grão de poeira espacial te parou.",
-            "Lenda em formação! O universo inteiro assiste ao seu voo.",
-            "🚀 Modo Turbo Ativado! Continue desviando com essa precisão.",
-            "Dupla Centena! Seu controle é absoluto. Mantenha o curso!",
-            "Pilotagem nível mestre. O próximo desafio espera!",
-            "Um Quarto do Caminho! Incrível! A recompensa está próxima.",
-            "A gravidade obedece a você. Siga em frente, comandante!",
-            "Três Centenas! Você está reescrevendo as regras da física.",
-            "Precisão Absoluta! Seu nome será gravado nas estrelas.",
-            "Que Voo! Você nem parece precisar de combustível.",
-            "Setor Crítico Superado! Nada pode te derrubar agora.",
-            "Quatro Centenas! Você está voando mais rápido que a informação.",
-            "Seu foco é lendário. Continue com essa determinação.",
-            "Mais um salto quântico em sua pontuação! Parabéns!",
-            "Nível de Reflexo: Divino! Mal posso acompanhar sua velocidade.",
-            "MEIO MILHÃO DE PONTOS! (Meio caminho para a glória!)",
-            "Retorno Triunfal! O universo inteiro celebra seu sucesso.",
-            "Maestria Total! Seu foguete parece deslizar no vácuo.",
-            "Nem mesmo um buraco negro ousaria te desafiar. Siga!",
-            "Seis Centenas! Que desempenho monumental.",
-            "Você é um Gênio Tático! Seus movimentos são perfeitos.",
-            "O Painel de Controle está em êxtase com sua performance.",
-            "Onde você aprendeu a voar assim? Absolutamente fabuloso!",
-            "Sete Centenas! A meta está logo ali, à vista!",
-            "Próximo Nível de Consciência: Você é a própria estrela.",
-            "Três Quartos do Caminho! A perseverança compensa.",
-            "Lançamento Bem Sucedido! Prepare-se para o final épico.",
-            "Oito Centenas! Os Deuses da Astrologia estão impressionados.",
-            "Você está em outra dimensão de pilotagem. Continue a magia!",
-            "Última Barreira de Setor! Você consegue ver o final?",
-            "Recorde de Velocidade Quebrado! Apenas você e o infinito.",
-            "Nove Centenas! Faltam apenas 100 para a Lenda!",
-            "Você está respirando no espaço com facilidade! Quase lá!",
-            "O Céu Não É o Limite! Continue ultrapassando expectativas.",
-            "PRÓXIMA PARADA: GLÓRIA! Apenas mais um passo...",
-            "🌟 NÍVEL LENDÁRIO ATINGIDO! Você é o MESTRE DO ESPAÇO! 🌟"
-        ];
-
-
-        const DIFICULDADE_CONFIG = {
-            'easy': {
-                grav: 0.1,
-                abert: 200,
-                y_thrust: -0.7,
-                x_thrust: 0.5,
-                max_speed: 4,
-                scroll_base: 2,
-                drag: 0.98,
-            },
-            'medium': {
-                grav: 0.4,
-                abert: 140,
-                y_thrust: -1.0,
-                x_thrust: 0.8,
-                max_speed: 6,
-                scroll_base: 4,
-                drag: 0.97,
-            },
-            'insane': {
-                grav: 0.8,
-                abert: 100,
-                y_thrust: -1.3,
-                x_thrust: 1.2,
-                max_speed: 8,
-                scroll_base: 7,
-                drag: 0.96,
-            }
-        };
-
-        // =========================================================
-        // FUNÇÕES DE SETUP E MENU
-        // =========================================================
-
-        function setup() {
-            let w = min(800, windowWidth);
-            let h = min(450, windowHeight);
-            let canvas = createCanvas(w, h);
-            canvas.parent(document.body);
-
-            // Previne o menu de contexto do botão direito e o comportamento padrão no toque
-            canvas.elt.addEventListener('contextmenu', e => e.preventDefault());
-            // CORREÇÃO: Adiciona 'touch-action: none' ao canvas para garantir que ele não seja arrastável
-            canvas.elt.style.touchAction = 'none';
-
-            let savedScore = localStorage.getItem('rocketRunHighScore');
-            if (savedScore !== null) {
-                highScore = parseInt(savedScore);
-            }
-
-            textAlign(CENTER, CENTER);
-            textFont('Arial');
-            noStroke();
-            frameRate(60);
-
-            for(let i = 0; i < 150; i++) {
-                estrelas.push({ x: random(width), y: random(height), size: random(1, 3), speed: random(0.5, 2) });
-            }
-
-            canvas.elt.style.display = 'none';
-            // Chama a função para verificar e mostrar/ocultar o D-Pad
-            checkAndToggleMobileControls();
-        }
-
-        // NOVO: Função para verificar o tipo de dispositivo e exibir os controles móveis (MANTIDO)
-        function checkAndToggleMobileControls() {
-            const isMobile = window.matchMedia("only screen and (max-width: 760px)").matches ||
-                             /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-            const mobileControls = document.getElementById('mobile-controls');
-
-            if (isMobile && gameState === 'running') {
-                mobileControls.classList.add('show-mobile-controls');
-                document.getElementById('controls-instruction').classList.add('hidden'); // Oculta a instrução de texto no celular
-            } else {
-                mobileControls.classList.remove('show-mobile-controls');
-                if (gameState === 'menu' || gameState === 'gameover') {
-                    document.getElementById('controls-instruction').classList.remove('hidden');
-                }
-            }
-        }
-
-        function showMenu() {
-            gameState = 'menu';
-            document.getElementById('menu-screen').classList.remove('hidden');
-            document.getElementById('gameover-screen').classList.add('hidden');
-            let canvas = select('canvas');
-            if (canvas) canvas.elt.style.display = 'none';
-            checkAndToggleMobileControls(); // Oculta os controles móveis no menu
-        }
-
-        function startGame(difficulty) {
-            currentDifficulty = difficulty;
-            const config = DIFICULDADE_CONFIG[difficulty];
-
-            gravidade = config.grav;
-            asteroideAbertura = config.abert;
-            y_thrust = config.y_thrust;
-            x_thrust = config.x_thrust;
-            max_speed = config.max_speed;
-            drag = config.drag;
-
-            rocketX = width / 4;
-            rocketY = height / 2;
-            rocketXVel = 0;
-            rocketYVel = 0;
-            asteroides = [];
-            score = 0;
-            combustivel = MAX_COMBUSTIVEL;
-            asteroides.push(new Asteroide());
-            gameState = 'running';
-            messageOverlay = null;
-            keys = {};
-            isBoostActive = false;
-
-            lastActionTime = frameCount;
-            autoPilotActive = false;
-
-            document.getElementById('menu-screen').classList.add('hidden');
-            document.getElementById('gameover-screen').classList.add('hidden');
-            document.getElementById('controls-instruction').classList.add('hidden');
-            let canvas = select('canvas');
-            if (canvas) canvas.elt.style.display = 'block';
-
-            checkAndToggleMobileControls(); // Exibe os controles móveis no jogo
-
-            loop();
-        }
-
-        function draw() {
-            if (gameState === 'menu') {
-                drawBackgroundGradient();
-                drawStars();
-                return;
-            }
-
-            drawBackgroundGradient();
-            drawStars();
-
-            if (gameState === 'running') {
-
-                // --- 1. APLICAÇÃO DOS CONTROLES (FORÇAS) ---
-
-                // Checa a condição de Impulso Extra (4x mais forte)
-                // Se ESPAÇO (32) OU Clique/Toque (isBoostActive) estiver ativo
-                const highBoostCondition = (keys[' '] || keys[32] || isBoostActive);
-
-                if (highBoostCondition) {
-                    // Impulso extra contínuo (mais forte)
-                    rocketYVel += y_thrust * 4.0;
-                } else if (keys['w'] || keys['W'] || keys['ArrowUp']) {
-                    // Impulso padrão (mais fraco) se o boost não estiver ativo
-                    rocketYVel += y_thrust;
-                }
-
-                // Vertical (Baixo ou Seta para Baixo)
-                // O botão 'propulsor' substitui 'W'/'ArrowUp' e 'S'/'ArrowDown' não tem botão virtual
-                if (keys['s'] || keys['S'] || keys['ArrowDown']) {
-                    rocketYVel -= y_thrust * 0.5;
-                }
-
-                // Horizontal (Frente/Trás ou D/A)
-                let rightThrustApplied = false;
-                if (keys['d'] || keys['D'] || keys['ArrowRight']) {
-                    rocketXVel += x_thrust;
-                    rightThrustApplied = true;
-                }
-                if (keys['a'] || keys['A'] || keys['ArrowLeft']) {
-                    rocketXVel -= x_thrust;
-                }
-
-                // Variável para checar se o jogador está fazendo QUALQUER coisa
-                let anyPlayerAction = (keys['w'] || keys['W'] || keys['ArrowUp'] || keys['s'] || keys['S'] || keys['ArrowDown'] || keys['a'] || keys['A'] || rightThrustApplied || highBoostCondition);
-
-
-                // --- LÓGICA DO PILOTO AUTOMÁTICO (Assistência Invisível) - MANTIDA ---
-                if (currentDifficulty === 'easy') {
-
-                    if (anyPlayerAction) {
-                        autoPilotActive = false;
-                        lastActionTime = frameCount;
-                    } else {
-                        if (frameCount > lastActionTime + AUTOPILOT_DELAY) {
-                            autoPilotActive = true;
-                        }
-                    }
-
-                    if (autoPilotActive) {
-                        rocketXVel += x_thrust * 0.2;
-                    }
-                }
-
-                // --- 2. FÍSICA E ATUALIZAÇÃO DE VELOCIDADE (MANTIDO) ---
-
-                rocketYVel += gravidade;
-                rocketXVel *= drag;
-                rocketYVel *= drag;
-
-                rocketXVel = constrain(rocketXVel, -max_speed, max_speed);
-                rocketYVel = constrain(rocketYVel, -max_speed, max_speed);
-
-                rocketX += rocketXVel;
-                rocketY += rocketYVel;
-
-                rocketX = constrain(rocketX, 15, width - 15);
-                rocketY = constrain(rocketY, 15, height - 15);
-
-                // --- 3. MOVIMENTO DO MUNDO (MANTIDO) ---
-
-                let xFactor = map(rocketX, width / 4, width - 15, 0, 1.5);
-                velocidadeJogo = DIFICULDADE_CONFIG[currentDifficulty].scroll_base + xFactor;
-
-                // GESTÃO DO COMBUSTÍVEL
-                let currentConsumption = CONSUMO_POR_FRAME * (anyPlayerAction ? 2 : 1);
-
-                combustivel -= currentConsumption;
-                combustivel = constrain(combustivel, 0, MAX_COMBUSTIVEL);
-
-                if (combustivel <= 0) {
-                    endGame("ACABOU O COMBUSTÍVEL!");
-                    return;
-                }
-
-                // --- 4. LÓGICA DE ASTEROIDES E COLISÃO (MANTIDO) ---
-
-                desenharFoguete(rocketX, rocketY, 30);
-
-                for (let i = asteroides.length - 1; i >= 0; i--) {
-                    asteroides[i].mover(velocidadeJogo);
-                    asteroides[i].desenhar();
-
-                    if (asteroides[i].checkCollision(rocketX, rocketY, 15)) {
-                        endGame("COLISÃO COM ASTEROIDE!");
-                    }
-
-                    if (asteroides[i].x < -asteroideLargura) {
-                        asteroides.splice(i, 1);
-                    }
-
-                    // LÓGICA DE PONTUAÇÃO
-                    if (!asteroides[i].scored && rocketX > asteroides[i].x + asteroideLargura) {
-                        score++;
-                        combustivel = MAX_COMBUSTIVEL;
-                        asteroides[i].scored = true;
-
-                        // Lógica de Mensagens Motivacionais
-                        if (score > 0 && score % 25 === 0 && score <= 1000) {
-                            let index = (score / 25) - 1;
-                            if (index < MENSAGENS_MOTIVACIONAIS.length) {
-                                messageOverlay = MENSAGENS_MOTIVACIONAIS[index];
-                                messageTimer = MESSAGE_DURATION;
-                            }
-                        }
-                    }
-                }
-
-                // Gera novos asteroides
-                let spawnInterval = max(30, 100 - (velocidadeJogo * 5));
-                if (frameCount % floor(spawnInterval) === 0) {
-                    asteroides.push(new Asteroide());
-                }
-
-                drawHUD();
-
-            } else if (gameState === 'gameover') {
-                desenharFoguete(rocketX, rocketY, 30);
-                drawHUD();
-            }
-
-            if (messageOverlay !== null) {
-                drawMessageOverlay();
-            }
-        }
-
-        // =========================================================
-        // FUNÇÕES DE INPUT (CORRIGIDAS/REFORÇADAS)
-        // =========================================================
-
-        // NOVO: Funções para simular keypress usando os botões HTML (MANTIDO)
-        function controlButtonDown(keyName) {
-            if (gameState === 'running') {
-                // Mapeia o nome da tecla para o objeto 'keys'
-                keys[keyName] = true;
-                // Evita que o toque no botão ative o impulso extra contínuo do touchStarted
-                if (keyName === 'w') {
-                    isBoostActive = false;
-                }
-            }
-        }
-
-        function controlButtonUp(keyName) {
-            if (gameState === 'running') {
-                keys[keyName] = false;
-            }
-        }
-
-        function keyPressed() {
-            if (gameState === 'running') {
-                keys[key] = true;
-                keys[keyCode] = true; // Para setas e ESPAÇO (32)
-            } else if (gameState === 'gameover' && (key === ' ' || keyCode === 32)) {
-                showMenu();
-            }
-            return false; // CORREÇÃO: Bloqueia o comportamento padrão do teclado no p5
-        }
-
-        function keyReleased() {
-            if (gameState === 'running') {
-                keys[key] = false;
-                keys[keyCode] = false;
-            }
-            return false;
-        }
-
-        // --- EVENTOS DE MOUSE/TOQUE (REFORÇADOS) ---
-
-        function mousePressed() {
-            // Verifica se o toque/clique NÃO foi em um dos botões do D-Pad
-            if (gameState === 'running' && mouseY < height) { // Checa se o clique foi dentro do canvas
-                isBoostActive = true; // Inicia o impulso contínuo
-            }
-            if (gameState === 'gameover') {
-                showMenu();
-            }
-            return false; // CORREÇÃO: ESSENCIAL no mousePressed para o navegador
-        }
-
-        function mouseReleased() {
-            if (gameState === 'running') {
-                isBoostActive = false; // Para o impulso contínuo
-            }
-            return false; // CORREÇÃO: Essencial
-        }
-
-        function touchStarted() {
-            // Evita o toque duplo nos botões (embora ontouchstart no HTML já ajude)
-            if (gameState === 'running' && touches.length > 0 && touches[0].y < height) {
-                // CORREÇÃO/AJUSTE: Garante que o toque no canvas (fora dos botões virtuais) ative o boost
-                // A lógica para verificar se o toque foi em um botão HTML (D-Pad) seria mais complexa aqui,
-                // mas 'isBoostActive = false' em controlButtonDown() já minimiza o conflito.
-                isBoostActive = true;
-            }
-            if (gameState === 'gameover') {
-                showMenu();
-            }
-            return false; // CORREÇÃO: ESSENCIAL. Bloqueia a rolagem/zoom do navegador no início do toque.
-        }
-
-        function touchMoved() {
-            // CORREÇÃO: Adicionada essa função, pois 'touchStarted' só bloqueia o primeiro toque,
-            // e 'touchMoved' impede o deslizar/arrastar do canvas.
-            return false;
-        }
-
-        function touchEnded() {
-             if (gameState === 'running') {
-                isBoostActive = false; // Para o impulso contínuo
-            }
-            return false; // CORREÇÃO: Essencial.
-        }
-
-
-        // =========================================================
-        // FUNÇÕES DE RESPONSIVIDADE (MODIFICADAS para chamar o check)
-        // =========================================================
-        function windowResized() {
-            let w = min(800, windowWidth);
-            let h = min(450, windowHeight);
-            resizeCanvas(w, h);
-            let canvas = select('canvas');
-            if (canvas) {
-                canvas.elt.style.left = `${(windowWidth - w) / 2}px`;
-                canvas.elt.style.top = `${(windowHeight - h) / 2}px`;
-            }
-            checkAndToggleMobileControls(); // Reajusta a exibição dos controles móveis
-        }
-
-        // =========================================================
-        // FUNÇÕES DE JOGO, DESENHO, CLASSE ASTEROIDE (MANTIDAS)
-        // =========================================================
-
-        function endGame(motivo) {
-            motivoFimDeJogo = motivo;
-            gameState = 'gameover';
-
-            if (score > highScore) {
-                highScore = score;
-                localStorage.setItem('rocketRunHighScore', highScore);
-            }
-
-            noLoop();
-
-            document.getElementById('gameover-reason').innerText = motivoFimDeJogo;
-            document.getElementById('final-score').innerText = score;
-            document.getElementById('high-score').innerText = highScore;
-            document.getElementById('gameover-screen').classList.remove('hidden');
-
-            checkAndToggleMobileControls(); // Oculta os controles móveis no Game Over
-        }
-
-        function drawMessageOverlay() {
-            if (messageTimer > 0) {
-                push();
-                let alpha = 255;
-                if (messageTimer < 60) {
-                    alpha = map(messageTimer, 0, 60, 0, 255);
-                } else if (messageTimer > MESSAGE_DURATION - 60) {
-                    alpha = map(messageTimer, MESSAGE_DURATION - 60, MESSAGE_DURATION, 0, 255);
-                }
-
-                fill(0, 0, 0, 200);
-                rect(0, height / 2 - 50, width, 100);
-
-                textSize(28 * (width / 800));
-                fill(255, 200, 0, alpha);
-                text(messageOverlay, width / 2, height / 2);
-
-                messageTimer--;
-                if (messageTimer <= 0) {
-                    messageOverlay = null;
-                }
-                pop();
-            }
-        }
-
-        function drawBackgroundGradient() {
-            push();
-            for (let y = 0; y < height; y++) {
-                let inter = map(y, 0, height, 0, 1);
-                let c = lerpColor(color(10, 0, 20), color(50, 0, 0), inter);
-                stroke(c);
-                line(0, y, width, y);
-            }
-            pop();
-        }
-
-        function drawStars() {
-            push();
-            fill(255);
-            for (let i = 0; i < estrelas.length; i++) {
-                let star = estrelas[i];
-
-                star.x -= star.speed * velocidadeJogo * 0.5;
-
-                if (star.x < 0) {
-                    star.x = width;
-                    star.y = random(height);
-                }
-
-                let c = (i % 5 === 0) ? color(255, 255, 255) : color(255, 100, 0, 150);
-                fill(c);
-                ellipse(star.x, star.y, star.size, star.size);
-            }
-            pop();
-        }
-
-        function drawHUD() {
-            push();
-            textSize(20 * (width / 800));
-            fill(255, 255, 255);
-            text("FOGUETE EM FUGA: ROTA DE SOBREVIVÊNCIA", width / 2, 25);
-
-            textSize(24 * (width / 800));
-            fill(255, 200, 0);
-            text(`SCORE: ${score}`, width - 100 * (width / 800), 60);
-
-            textSize(18 * (width / 800));
-            fill(255, 255, 255);
-            text(`RECORD: ${highScore}`, width - 100 * (width / 800), 90);
-
-            let nivel = currentDifficulty.toUpperCase();
-            let corNivel;
-            if (currentDifficulty === 'easy') {
-                corNivel = color(100, 255, 100);
-            } else if (currentDifficulty === 'medium') {
-                corNivel = color(255, 255, 0);
-            } else {
-                corNivel = color(255, 50, 50);
-            }
-
-            fill(corNivel);
-            textSize(18 * (width / 800));
-            text(`MODO: ${nivel}`, 100 * (width / 800), 60);
-
-            drawFuelGauge(40 * (width / 800), 90, 15, 200 * (width / 800));
-
-            textSize(14 * (width / 800));
-            fill(200, 200, 255);
-            text(`VELOCIDADE: ${nf(velocidadeJogo, 1, 1)}`, 100 * (width / 800), 115);
-
-            pop();
-        }
-
-        function drawFuelGauge(x, y, h, w) {
-            push();
-            textSize(14 * (width / 800));
-            fill(255);
-            text("COMBUSTÍVEL", x + w/2, y - 5);
-
-            fill(50);
-            stroke(255);
-            strokeWeight(1);
-            rect(x, y, w, h, 5);
-
-            let fuelWidth = map(combustivel, 0, MAX_COMBUSTIVEL, 0, w);
-
-            let fuelColor;
-            if (combustivel < 20) {
-                fuelColor = color(255, 0, 0);
-            } else if (combustivel < 50) {
-                fuelColor = color(255, 255, 0);
-            } else {
-                fuelColor = color(0, 200, 0);
-            }
-
-            noStroke();
-            fill(fuelColor);
-            rect(x + 1, y + 1, fuelWidth - 2, h - 2, 4);
-
-            pop();
-        }
-
-        function desenharFoguete(x, y, tamanho) {
-            push();
-
-            let rastroAlpha = map(combustivel, 0, MAX_COMBUSTIVEL, 50, 255);
-            let trailLength = map(rocketYVel, -max_speed, max_speed, 10, 20);
-
-            let rotationAngle = map(rocketYVel, -max_speed, max_speed, radians(-20), radians(20));
-
-            translate(x, y);
-            rotate(rotationAngle);
-
-            // Rastro de Propulsão (Baseado no Y, para dar a sensação de impulso para cima)
-            if (rocketYVel < 0 || keys['w'] || keys['W'] || keys['ArrowUp'] || isBoostActive || keys[' '] || keys[32]) {
-                fill(255, 150, 0, rastroAlpha);
-                ellipse(-tamanho/2 - 5, 0, 10 + random(0, 5), 15 + random(0, 10));
-            }
-
-            // Rastro Lateral (Baseado no X, para dar a sensação de impulso lateral)
-            if (keys['a'] || keys['A'] || keys['ArrowLeft']) {
-                fill(0, 200, 255, rastroAlpha * 0.5); // Azul para freio
-                rect(tamanho/2 - 5, -tamanho/2, 5, tamanho);
-            } else if (keys['d'] || keys['D'] || keys['ArrowRight'] || (currentDifficulty === 'easy' && autoPilotActive)) {
-                fill(255, 100, 0, rastroAlpha * 0.5); // Laranja para aceleração (inclui Autopilot no rastro)
-                rect(-tamanho/2 - 5, -tamanho/2, 5, tamanho);
-            }
-
-
-            // Corpo do Foguete com Sombra
-            noStroke();
-            fill(100);
-            triangle(-tamanho/2 + 2, tamanho/2 + 2, -tamanho/2 + 2, -tamanho/2 + 2, tamanho/2 + 2, 2);
-
-            fill(180); // Cor principal
-            triangle(-tamanho/2, -tamanho/2, -tamanho/2, tamanho/2, tamanho/2, 0);
-
-            // Ponta Vermelha
-            fill(200, 50, 50);
-            triangle(tamanho/2, 0, tamanho/2 - 5, -5, tamanho/2 - 5, 5);
-
-            pop();
-        }
-
-        // =========================================================
-        // CLASSE ASTEROIDE (MANTIDA)
-        // =========================================================
-
-        class Asteroide {
-            constructor() {
-                this.x = width;
-                this.centroAbertura = random(asteroideAbertura / 2 + 30, height - asteroideAbertura / 2 - 30);
-                this.topo = this.centroAbertura - asteroideAbertura / 2;
-                this.fundo = this.centroAbertura + asteroideAbertura / 2;
-                this.scored = false;
-
-                // Adiciona a variação de y para o asteróide se mover (mantido)
-                this.yOffset = random(-30, 30);
-                this.ySpeed = random(0.5, 1.5) * (random() > 0.5 ? 1 : -1);
-            }
-
-            mover(velocidade) {
-                this.x -= velocidade;
-                // Movimento senoidal para o buraco do asteróide
-                this.yOffset += this.ySpeed * 0.1;
-                if (this.yOffset > 30 || this.yOffset < -30) {
-                    this.ySpeed *= -1;
-                }
-                this.centroAbertura += this.yOffset * 0.05;
-                this.centroAbertura = constrain(this.centroAbertura, asteroideAbertura / 2 + 30, height - asteroideAbertura / 2 - 30);
-                this.topo = this.centroAbertura - asteroideAbertura / 2;
-                this.fundo = this.centroAbertura + asteroideAbertura / 2;
-            }
-
-            desenhar() {
-                push();
-                fill(100, 100, 100);
-                // Asteroide de Cima
-                rect(this.x, 0, asteroideLargura, this.topo);
-                // Asteroide de Baixo
-                rect(this.x, this.fundo, asteroideLargura, height - this.fundo);
-                pop();
-            }
-
-            checkCollision(rocketX, rocketY, rocketRadius) {
-                // Colisão com asteroide de cima
-                if (rocketX + rocketRadius > this.x && rocketX - rocketRadius < this.x + asteroideLargura) {
-                    if (rocketY - rocketRadius < this.topo || rocketY + rocketRadius > this.fundo) {
-                        return true;
-                    }
-                }
-                // Colisão com bordas do canvas (não implementada neste exemplo, mas boa prática)
-                return false;
-            }
-        }
-
-    </script>
+    <div id="menu-screen" class="menu-container">
+        <h1>ROCKET RUN PRO</h1>
+        <p>SELECIONE O NÍVEL DE DIFICULDADE</p>
+        <button class="difficulty-button easy" onclick="startGame('easy')">FÁCIL</button>
+        <button class="difficulty-button medium" onclick="startGame('medium')">MÉDIO</button>
+        <button class="difficulty-button insane" onclick="startGame('insane')">ESTOU LOUCO (só para loucos)</button>
+    </div>
+
+    <div id="gameover-screen" class="game-over-container hidden">
+        <h1>MISSÃO FALHOU</h1>
+        <h2 id="gameover-reason"></h2>
+        <div class="score-display">
+            Pontuação: <span id="final-score">0</span>
+        </div>
+        <div class="score-display">
+            Recorde: <span id="high-score">0</span>
+        </div>
+        <button class="restart-button easy" onclick="showMenu()">REINICIAR</button>
+    </div>
+
+    <div id="controls-instruction">
+        Controles: WASD ou SETAS (Mover), Clique/Toque/ESPAÇO (Impulso Extra Contínuo)
+    </div>
+    
+    <script>
+        // Global
+        let rocketX;
+        let rocketY; 
+        let rocketXVel = 0;
+        let rocketYVel = 0;
+        let combustivel;
+        const MAX_COMBUSTIVEL = 100;
+        const CONSUMO_POR_FRAME = 0.05;
+        let asteroides = [];
+        let score = 0;
+        let gameState = 'menu'; // Novo estado inicial
+        let motivoFimDeJogo = "";
+        let highScore = 0;
+        let estrelas = [];
+        let currentDifficulty = 'easy';
+        let asteroideLargura = 50;
+
+        // NOVO: Estado para controle de clique/toque (Impulso Extra Contínuo)
+        let isBoostActive = false; 
+
+        // Variáveis para Mensagem Motivacional
+        let messageOverlay = null;
+        let messageTimer = 0;
+        const MESSAGE_DURATION = 180; // 3 segundos (60 frames por segundo)
+        let keys = {}; // Estado das teclas pressionadas
+
+        // Variáveis para Autopilot (Assistência Invisível - EASY mode)
+        let lastActionTime = 0; 
+        let autoPilotActive = false;
+        const AUTOPILOT_DELAY = 120; // 2 segundos * 60 FPS (para ativar o autopilot)
+
+
+        // Variáveis que MUDAM por DIFICULDADE
+        let gravidade;
+        let asteroideAbertura; 
+        let velocidadeJogo; // Velocidade de rolagem do mundo
+        let y_thrust;
+        let x_thrust;
+        let max_speed;
+        let drag; // Fricção
+
+        // Lista de 40 Mensagens Motivacionais (a cada 25 pontos, até 1000)
+        const MENSAGENS_MOTIVACIONAIS = [
+            "Uau! Você é um ás da pilotagem! Avance para o próximo setor.", // 25
+            "Impecável! Seu histórico de voo é perfeito. Continue assim!", // 50
+            "Setor de Meio de Jogo: Você é imparável. A lenda diz que poucos chegam aqui!", // 75
+            "Meta de 100 atingida! A velocidade da luz não é páreo para você.", // 100
+            "Excelente manobra! Nem um grão de poeira espacial te parou.", // 125
+            "Lenda em formação! O universo inteiro assiste ao seu voo.", // 150
+            "🚀 Modo Turbo Ativado! Continue desviando com essa precisão.", // 175
+            "Dupla Centena! Seu controle é absoluto. Mantenha o curso!", // 200
+            "Pilotagem nível mestre. O próximo desafio espera!", // 225
+            "Um Quarto do Caminho! Incrível! A recompensa está próxima.", // 250
+            "A gravidade obedece a você. Siga em frente, comandante!", // 275
+            "Três Centenas! Você está reescrevendo as regras da física.", // 300
+            "Precisão Absoluta! Seu nome será gravado nas estrelas.", // 325
+            "Que Voo! Você nem parece precisar de combustível.", // 350
+            "Setor Crítico Superado! Nada pode te derrubar agora.", // 375
+            "Quatro Centenas! Você está voando mais rápido que a informação.", // 400
+            "Seu foco é lendário. Continue com essa determinação.", // 425
+            "Mais um salto quântico em sua pontuação! Parabéns!", // 450
+            "Nível de Reflexo: Divino! Mal posso acompanhar sua velocidade.", // 475
+            "MEIO MILHÃO DE PONTOS! (Meio caminho para a glória!)", // 500
+            "Retorno Triunfal! O universo inteiro celebra seu sucesso.", // 525
+            "Maestria Total! Seu foguete parece deslizar no vácuo.", // 550
+            "Nem mesmo um buraco negro ousaria te desafiar. Siga!", // 575
+            "Seis Centenas! Que desempenho monumental.", // 600
+            "Você é um Gênio Tático! Seus movimentos são perfeitos.", // 625
+            "O Painel de Controle está em êxtase com sua performance.", // 650
+            "Onde você aprendeu a voar assim? Absolutamente fabuloso!", // 675
+            "Sete Centenas! A meta está logo ali, à vista!", // 700
+            "Próximo Nível de Consciência: Você é a própria estrela.", // 725
+            "Três Quartos do Caminho! A perseverança compensa.", // 750
+            "Lançamento Bem Sucedido! Prepare-se para o final épico.", // 775
+            "Oito Centenas! Os Deuses da Astrologia estão impressionados.", // 800
+            "Você está em outra dimensão de pilotagem. Continue a magia!", // 825
+            "Última Barreira de Setor! Você consegue ver o final?", // 850
+            "Recorde de Velocidade Quebrado! Apenas você e o infinito.", // 875
+            "Nove Centenas! Faltam apenas 100 para a Lenda!", // 900
+            "Você está respirando no espaço com facilidade! Quase lá!", // 925
+            "O Céu Não É o Limite! Continue ultrapassando expectativas.", // 950
+            "PRÓXIMA PARADA: GLÓRIA! Apenas mais um passo...", // 975
+            "🌟 NÍVEL LENDÁRIO ATINGIDO! Você é o MESTRE DO ESPAÇO! 🌟" // 1000
+        ];
+
+
+        const DIFICULDADE_CONFIG = {
+            'easy': {
+                grav: 0.1, // Gravidade (empurra para baixo)
+                abert: 200, // Abertura gigantesca
+                y_thrust: -0.7, // Impulso vertical (WASD Y)
+                x_thrust: 0.5, // Impulso horizontal (WASD X)
+                max_speed: 4, // Velocidade máxima (horizontal e vertical)
+                scroll_base: 2, // Velocidade base do mundo
+                drag: 0.98, // Fricção (mais perto de 1, menos fricção)
+            },
+            'medium': {
+                grav: 0.4, 
+                abert: 140,
+                y_thrust: -1.0,
+                x_thrust: 0.8,
+                max_speed: 6,
+                scroll_base: 4,
+                drag: 0.97,
+            },
+            // MODO INSANO: Quase injogável, como solicitado
+            'insane': {
+                grav: 0.8, // Gravidade PESADÍSSIMA
+                abert: 100, // Abertura minúscula
+                y_thrust: -1.3,
+                x_thrust: 1.2,
+                max_speed: 8,
+                scroll_base: 7,
+                drag: 0.96, // Menos fricção = mais difícil de parar
+            }
+        };
+
+        // =========================================================
+        // FUNÇÕES DE SETUP E MENU
+        // =========================================================
+
+        function setup() {
+            // Responsividade: O canvas terá o tamanho máximo de 800x450, mas será reduzido para caber na janela.
+            let w = min(800, windowWidth);
+            let h = min(450, windowHeight);
+            let canvas = createCanvas(w, h); 
+            canvas.parent(document.body); // Coloca o canvas no corpo do documento
+            
+            // Previne o menu de contexto do botão direito e o comportamento padrão no toque
+            canvas.elt.addEventListener('contextmenu', e => e.preventDefault()); 
+
+            // Carrega o recorde salvo (localStorage)
+            let savedScore = localStorage.getItem('rocketRunHighScore');
+            if (savedScore !== null) {
+                highScore = parseInt(savedScore);
+            }
+            
+            // Configurações de Texto e Estilo Base
+            textAlign(CENTER, CENTER);
+            textFont('Arial'); 
+            noStroke(); 
+            frameRate(60); 
+            
+            // Inicializa Estrelas
+            for(let i = 0; i < 150; i++) {
+                estrelas.push({ x: random(width), y: random(height), size: random(1, 3), speed: random(0.5, 2) });
+            }
+            
+            // Oculta o canvas ao iniciar para mostrar o menu
+            canvas.elt.style.display = 'none';
+        }
+
+        function showMenu() {
+            gameState = 'menu';
+            document.getElementById('menu-screen').classList.remove('hidden');
+            document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('controls-instruction').classList.remove('hidden');
+            let canvas = select('canvas');
+            if (canvas) canvas.elt.style.display = 'none';
+        }
+
+        function startGame(difficulty) {
+            currentDifficulty = difficulty;
+            const config = DIFICULDADE_CONFIG[difficulty];
+
+            // Aplica as configurações de dificuldade
+            gravidade = config.grav;
+            asteroideAbertura = config.abert;
+            y_thrust = config.y_thrust;
+            x_thrust = config.x_thrust;
+            max_speed = config.max_speed;
+            drag = config.drag;
+            
+            // Inicializa estado de jogo
+            rocketX = width / 4; // Começa mais à esquerda
+            rocketY = height / 2;
+            rocketXVel = 0;
+            rocketYVel = 0;
+            asteroides = [];
+            score = 0;
+            combustivel = MAX_COMBUSTIVEL;
+            asteroides.push(new Asteroide());
+            gameState = 'running';
+            messageOverlay = null; // Limpa qualquer mensagem pendente
+            keys = {}; // Limpa o estado das teclas
+            isBoostActive = false; // Garante que o boost por clique/toque comece desligado
+
+            // Autopilot Reset: Começa com o autopilot desligado, mas o timer zerado
+            lastActionTime = frameCount; 
+            autoPilotActive = false;
+
+            // Oculta o menu e mostra o canvas
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('controls-instruction').classList.add('hidden');
+            let canvas = select('canvas');
+            if (canvas) canvas.elt.style.display = 'block';
+
+            loop();
+        }
+
+        function draw() {
+            // Se estiver no menu, não desenha nada além do fundo
+            if (gameState === 'menu') {
+                 drawBackgroundGradient(); 
+                 drawStars();
+                 return; // Sai do draw()
+            }
+            
+            drawBackgroundGradient(); 
+            drawStars(); 
+            
+            if (gameState === 'running') {
+
+                // --- 1. APLICAÇÃO DOS CONTROLES (FORÇAS) ---
+
+                // Checa a condição de Impulso Extra (4x mais forte)
+                // Se ESPAÇO (32) OU Clique/Toque (isBoostActive) estiver ativo
+                const highBoostCondition = (keys[' '] || keys[32] || isBoostActive);
+
+                if (highBoostCondition) {
+                    // Impulso extra contínuo (mais forte)
+                    rocketYVel += y_thrust * 4.0;
+                } else if (keys['w'] || keys['W'] || keys['ArrowUp']) {
+                    // Impulso padrão (mais fraco) se o boost não estiver ativo
+                    rocketYVel += y_thrust;
+                }
+
+                // Vertical (Baixo ou Seta para Baixo)
+                if (keys['s'] || keys['S'] || keys['ArrowDown']) {
+                    rocketYVel -= y_thrust * 0.5; // Menor impulso para baixo
+                }
+
+                // Horizontal (Frente/Trás ou D/A)
+                let rightThrustApplied = false;
+                if (keys['d'] || keys['D'] || keys['ArrowRight']) {
+                    rocketXVel += x_thrust;
+                    rightThrustApplied = true;
+                }
+                if (keys['a'] || keys['A'] || keys['ArrowLeft']) {
+                    rocketXVel -= x_thrust;
+                }
+                
+                // Variável para checar se o jogador está fazendo QUALQUER coisa
+                let anyPlayerAction = (keys['w'] || keys['W'] || keys['ArrowUp'] || keys['s'] || keys['S'] || keys['ArrowDown'] || keys['a'] || keys['A'] || rightThrustApplied || highBoostCondition);
+
+
+                // --- LÓGICA DO PILOTO AUTOMÁTICO (Assistência Invisível) ---
+                if (currentDifficulty === 'easy') {
+                    
+                    if (anyPlayerAction) {
+                        // 1. Reseta o Timer e Desativa o Autopilot em qualquer ação ativa do jogador.
+                        autoPilotActive = false;
+                        lastActionTime = frameCount;
+                    } else {
+                        // 2. Nenhuma ação: Tenta Ativar o Autopilot após o delay (2 segundos)
+                        if (frameCount > lastActionTime + AUTOPILOT_DELAY) {
+                            autoPilotActive = true;
+                        }
+                    }
+
+                    // 3. Aplica o Impulso Automático se estiver ativo
+                    if (autoPilotActive) {
+                        // Aplica um impulso constante para a direita, suave (20% do impulso normal)
+                        rocketXVel += x_thrust * 0.2; 
+                    }
+                }
+
+                // --- 2. FÍSICA E ATUALIZAÇÃO DE VELOCIDADE ---
+                
+                // Aplica Gravidade (para baixo)
+                rocketYVel += gravidade;
+
+                // Aplica Fricção (Drag)
+                rocketXVel *= drag;
+                rocketYVel *= drag;
+
+                // Limita a Velocidade Máxima
+                rocketXVel = constrain(rocketXVel, -max_speed, max_speed);
+                rocketYVel = constrain(rocketYVel, -max_speed, max_speed);
+                
+                // Atualiza Posição
+                rocketX += rocketXVel;
+                rocketY += rocketYVel;
+
+                // Restringe o Foguete aos Limites da Tela (Borda dura)
+                rocketX = constrain(rocketX, 15, width - 15);
+                rocketY = constrain(rocketY, 15, height - 15);
+                
+                // --- 3. MOVIMENTO DO MUNDO (Velocidade de Rolagem) ---
+                
+                // A velocidade do jogo (rolagem) depende da posição horizontal do foguete (quanto mais à direita, mais rápido)
+                let xFactor = map(rocketX, width / 4, width - 15, 0, 1.5); // Acelera se estiver mais à direita
+                velocidadeJogo = DIFICULDADE_CONFIG[currentDifficulty].scroll_base + xFactor;
+
+                // GESTÃO DO COMBUSTÍVEL
+                // Consome mais combustível se estiver usando impulso
+                let currentConsumption = CONSUMO_POR_FRAME * (anyPlayerAction ? 2 : 1);
+
+                combustivel -= currentConsumption;
+                combustivel = constrain(combustivel, 0, MAX_COMBUSTIVEL); 
+                
+                if (combustivel <= 0) {
+                    endGame("ACABOU O COMBUSTÍVEL!");
+                    return; 
+                }
+                
+                // --- 4. LÓGICA DE ASTEROIDES E COLISÃO ---
+
+                desenharFoguete(rocketX, rocketY, 30);
+                
+                for (let i = asteroides.length - 1; i >= 0; i--) {
+                    asteroides[i].mover(velocidadeJogo); // Move com a nova velocidade
+                    asteroides[i].desenhar();
+
+                    if (asteroides[i].checkCollision(rocketX, rocketY, 15)) { 
+                        endGame("COLISÃO COM ASTEROIDE!");
+                    }
+
+                    if (asteroides[i].x < -asteroideLargura) {
+                        asteroides.splice(i, 1);
+                    }
+                    
+                    // LÓGICA DE PONTUAÇÃO (CORRIGIDA PARA 1 PONTO POR BARREIRA)
+                    if (!asteroides[i].scored && rocketX > asteroides[i].x + asteroideLargura) {
+                        score++; // AGORA SIM: APENAS 1 PONTO POR OBSTÁCULO ULTRAPASSADO.
+                        combustivel = MAX_COMBUSTIVEL; // Recarrega
+                        asteroides[i].scored = true; // Marca como pontuado
+                        
+                        // Lógica de Mensagens Motivacionais (a cada 25 pontos)
+                        if (score > 0 && score % 25 === 0 && score <= 1000) {
+                            let index = (score / 25) - 1;
+                            if (index < MENSAGENS_MOTIVACIONAIS.length) {
+                                messageOverlay = MENSAGENS_MOTIVACIONAIS[index];
+                                messageTimer = MESSAGE_DURATION;
+                            }
+                        }
+                    }
+                }
+
+                // Gera novos asteroides (ajustado para a nova velocidade de rolagem)
+                // O tempo de geração deve ser inversamente proporcional à velocidade do jogo
+                let spawnInterval = max(30, 100 - (velocidadeJogo * 5)); // Mínimo de 30 frames
+                if (frameCount % floor(spawnInterval) === 0) { 
+                    asteroides.push(new Asteroide());
+                }
+
+                // Mostra o HUD Principal
+                drawHUD();
+
+            } else if (gameState === 'gameover') {
+                 // Redesenha a última posição do foguete antes de parar
+                 desenharFoguete(rocketX, rocketY, 30);
+                 drawHUD();
+            }
+
+            // Exibe a mensagem de motivação, se houver
+            if (messageOverlay !== null) {
+                drawMessageOverlay();
+            }
+        }
+
+        // =========================================================
+        // FUNÇÕES DE INPUT (CORRIGIDAS PARA CONTROLE CONTÍNUO)
+        // =========================================================
+
+        function keyPressed() {
+            if (gameState === 'running') {
+                keys[key] = true;
+                keys[keyCode] = true; // Para setas e ESPAÇO (32)
+            } else if (gameState === 'gameover' && (key === ' ' || keyCode === 32)) {
+                // Se estiver em gameover, espaço retorna ao menu
+                showMenu();
+            }
+        }
+
+        function keyReleased() {
+            if (gameState === 'running') {
+                keys[key] = false;
+                keys[keyCode] = false;
+            }
+        }
+        
+        // --- EVENTOS DE MOUSE/TOQUE ---
+
+        function mousePressed() {
+            if (gameState === 'running') {
+                isBoostActive = true; // Inicia o impulso contínuo
+            }
+             // Retorna ao menu se estiver em gameover, no clique
+            if (gameState === 'gameover') {
+                showMenu();
+            }
+        }
+
+        function mouseReleased() {
+            if (gameState === 'running') {
+                isBoostActive = false; // Para o impulso contínuo
+            }
+        }
+        
+        function touchStarted() {
+            if (gameState === 'running') {
+                isBoostActive = true; // Inicia o impulso contínuo
+            }
+            // Retorna ao menu se estiver em gameover, no toque
+            if (gameState === 'gameover') {
+                showMenu();
+            }
+            return false; // Previne o comportamento padrão do toque (como zoom)
+        }
+
+        function touchEnded() {
+             if (gameState === 'running') {
+                isBoostActive = false; // Para o impulso contínuo
+            }
+        }
+
+
+        // =========================================================
+        // FUNÇÕES DE RESPONSIVIDADE (inalteradas)
+        // =========================================================
+        function windowResized() {
+            let w = min(800, windowWidth);
+            let h = min(450, windowHeight);
+            resizeCanvas(w, h);
+            // Re-centraliza o menu/gameover
+            let canvas = select('canvas');
+            if (canvas) {
+                canvas.elt.style.left = `${(windowWidth - w) / 2}px`;
+                canvas.elt.style.top = `${(windowHeight - h) / 2}px`;
+            }
+        }
+
+        // =========================================================
+        // FUNÇÕES DE JOGO E SOBREPOSIÇÃO
+        // =========================================================
+
+        function endGame(motivo) {
+            motivoFimDeJogo = motivo;
+            gameState = 'gameover';
+            
+            // Verifica e salva o novo recorde
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('rocketRunHighScore', highScore);
+            }
+            
+            noLoop(); // Para o loop do P5
+
+            // Exibe a tela de Game Over HTML
+            document.getElementById('gameover-reason').innerText = motivoFimDeJogo;
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('high-score').innerText = highScore;
+            document.getElementById('gameover-screen').classList.remove('hidden');
+        }
+
+        function drawMessageOverlay() {
+            if (messageTimer > 0) {
+                push();
+                let alpha = 255;
+                // Efeitos de Fade In e Fade Out
+                if (messageTimer < 60) { 
+                    alpha = map(messageTimer, 0, 60, 0, 255);
+                } else if (messageTimer > MESSAGE_DURATION - 60) {
+                    alpha = map(messageTimer, MESSAGE_DURATION - 60, MESSAGE_DURATION, 0, 255);
+                }
+
+                // Fundo da mensagem
+                fill(0, 0, 0, 200);
+                rect(0, height / 2 - 50, width, 100);
+
+                // Texto da Mensagem
+                textSize(28 * (width / 800));
+                fill(255, 200, 0, alpha); // Cor do texto motivacional
+                text(messageOverlay, width / 2, height / 2);
+                
+                messageTimer--;
+                if (messageTimer <= 0) {
+                    messageOverlay = null; // Remove a mensagem
+                }
+                pop();
+            }
+        }
+
+        // =========================================================
+        // FUNÇÕES DE DESENHO E ESTÉTICA
+        // =========================================================
+
+        function drawBackgroundGradient() {
+            push(); 
+            for (let y = 0; y < height; y++) {
+                let inter = map(y, 0, height, 0, 1);
+                // Gradiente escuro/vermelho
+                let c = lerpColor(color(10, 0, 20), color(50, 0, 0), inter); 
+                stroke(c);
+                line(0, y, width, y);
+            }
+            pop(); 
+        }
+
+        function drawStars() {
+            push();
+            fill(255);
+            for (let i = 0; i < estrelas.length; i++) {
+                let star = estrelas[i];
+                
+                // Velocidade das estrelas baseada na velocidade do jogo
+                star.x -= star.speed * velocidadeJogo * 0.5; 
+                
+                if (star.x < 0) {
+                    star.x = width;
+                    star.y = random(height);
+                }
+                
+                let c = (i % 5 === 0) ? color(255, 255, 255) : color(255, 100, 0, 150);
+                fill(c); 
+                ellipse(star.x, star.y, star.size, star.size);
+            }
+            pop();
+        }
+
+        function drawHUD() {
+            push();
+            // Título
+            textSize(20 * (width / 800)); 
+            fill(255, 255, 255); 
+            text("FOGUETE EM FUGA: ROTA DE SOBREVIVÊNCIA", width / 2, 25);
+            
+            // PONTUAÇÃO ATUAL
+            textSize(24 * (width / 800)); 
+            fill(255, 200, 0); 
+            text(`SCORE: ${score}`, width - 100 * (width / 800), 60);
+
+            // RECORDE
+            textSize(18 * (width / 800));
+            fill(255, 255, 255);
+            text(`RECORD: ${highScore}`, width - 100 * (width / 800), 90); 
+
+            // NÍVEL DE DIFICULDADE ATUAL
+            let nivel = currentDifficulty.toUpperCase();
+            let corNivel;
+            if (currentDifficulty === 'easy') {
+                 corNivel = color(100, 255, 100);
+            } else if (currentDifficulty === 'medium') {
+                corNivel = color(255, 255, 0);
+            } else {
+                 corNivel = color(255, 50, 50); // Insano
+            }
+
+            fill(corNivel);
+            textSize(18 * (width / 800)); 
+            text(`MODO: ${nivel}`, 100 * (width / 800), 60); 
+            
+            // MEDIDOR DE COMBUSTÍVEL
+            drawFuelGauge(40 * (width / 800), 90, 15, 200 * (width / 800)); 
+
+            // VELOCIDADE DO MUNDO
+            textSize(14 * (width / 800));
+            fill(200, 200, 255);
+            text(`VELOCIDADE: ${nf(velocidadeJogo, 1, 1)}`, 100 * (width / 800), 115);
+
+            pop();
+        }
+
+        function drawFuelGauge(x, y, h, w) {
+            push();
+            textSize(14 * (width / 800));
+            fill(255);
+            text("COMBUSTÍVEL", x + w/2, y - 5);
+            
+            // Fundo da barra com borda
+            fill(50);
+            stroke(255); 
+            strokeWeight(1);
+            rect(x, y, w, h, 5); 
+            
+            let fuelWidth = map(combustivel, 0, MAX_COMBUSTIVEL, 0, w);
+            
+            let fuelColor;
+            if (combustivel < 20) {
+                fuelColor = color(255, 0, 0); 
+            } else if (combustivel < 50) {
+                fuelColor = color(255, 255, 0); 
+            } else {
+                fuelColor = color(0, 200, 0); 
+            }
+            
+            // Desenha a barra de combustível
+            noStroke(); 
+            fill(fuelColor);
+            rect(x + 1, y + 1, fuelWidth - 2, h - 2, 4); 
+            
+            pop(); 
+        }
+
+        function desenharFoguete(x, y, tamanho) {
+            push();
+            
+            let rastroAlpha = map(combustivel, 0, MAX_COMBUSTIVEL, 50, 255);
+            
+            // --- CÁLCULO DA ROTAÇÃO (Pitch) ---
+            // Gira o foguete para dar uma sensação de direção vertical
+            let rotationAngle = map(rocketYVel, -max_speed, max_speed, radians(-20), radians(20));
+            
+            translate(x, y);
+            rotate(rotationAngle);
+            
+            // Rastro de Propulsão (Baseado no Y, para dar a sensação de impulso para cima)
+            if (rocketYVel < 0 || keys['w'] || keys['W'] || keys['ArrowUp'] || isBoostActive || keys[' '] || keys[32]) {
+                fill(255, 150, 0, rastroAlpha); 
+                ellipse(-tamanho/2 - 5, 0, 10 + random(0, 5), 15 + random(0, 10)); 
+            }
+            
+            // Rastro Lateral (Baseado no X, para dar a sensação de impulso lateral)
+            if (keys['a'] || keys['A'] || keys['ArrowLeft']) {
+                fill(0, 200, 255, rastroAlpha * 0.5); // Azul para freio
+                rect(tamanho/2 - 5, -tamanho/2, 5, tamanho);
+            } else if (keys['d'] || keys['D'] || keys['ArrowRight'] || (currentDifficulty === 'easy' && autoPilotActive)) {
+                 fill(255, 100, 0, rastroAlpha * 0.5); // Laranja para aceleração (inclui Autopilot no rastro)
+                rect(-tamanho/2 - 5, -tamanho/2, 5, tamanho);
+            }
+            
+            
+            // Corpo do Foguete com Sombra
+            noStroke();
+            fill(100); 
+            triangle(-tamanho/2 + 2, tamanho/2 + 2, -tamanho/2 + 2, -tamanho/2 + 2, tamanho/2 + 2, 2); 
+            
+            fill(180); // Cor principal
+            triangle(-tamanho/2, -tamanho/2, -tamanho/2, tamanho/2, tamanho/2, 0); 
+            
+            // Ponta Vermelha
+            fill(200, 50, 50); 
+            triangle(tamanho/2, 0, tamanho/2 - 5, -5, tamanho/2 - 5, 5); 
+            
+            pop();
+        }
+
+        // =========================================================
+        // CLASSE ASTEROIDE (COMPLETA)
+        // =========================================================
+
+        class Asteroide {
+            constructor() {
+                this.x = width;
+                // Usa asteroideAbertura global
+                this.centroAbertura = random(asteroideAbertura / 2 + 30, height - asteroideAbertura / 2 - 30);
+                this.topo = this.centroAbertura - asteroideAbertura / 2;
+                this.fundo = this.centroAbertura + asteroideAbertura / 2;
+                this.scored = false; // AGORA SÓ HÁ PONTUAÇÃO SE ESTIVER 'false'
+            }
+
+            desenhar() {
+                push(); 
+                stroke(200, 50, 50); 
+                noFill();
+                strokeWeight(3);
+                
+                // Desenha o Asteroide (parte superior)
+                fill(100, 100, 100); // Cor de asteroide (cinza)
+                rect(this.x, 0, asteroideLargura, this.topo);
+                
+                // Detalhe de iluminação superior
+                fill(150, 150, 150, 100);
+                rect(this.x, 0, asteroideLargura, this.topo/4);
+                
+                // Desenha o Asteroide (parte inferior)
+                fill(100, 100, 100);
+                rect(this.x, this.fundo, asteroideLargura, height - this.fundo);
+
+                // Detalhe de iluminação inferior
+                fill(150, 150, 150, 100);
+                rect(this.x, this.fundo, asteroideLargura, (height - this.fundo)/4);
+                
+                pop();
+            }
+
+            mover(velocidade) {
+                this.x -= velocidade;
+            }
+
+            // Lógica de Colisão AABB (Axis-Aligned Bounding Box)
+            checkCollision(rocketX, rocketY, rocketRadius) {
+                // Lados do foguete (usando raio para simplificar)
+                let rocketLeft = rocketX - rocketRadius;
+                let rocketRight = rocketX + rocketRadius;
+                let rocketTop = rocketY - rocketRadius;
+                let rocketBottom = rocketY + rocketRadius;
+
+                // Colisão Horizontal (o foguete está entre os lados do asteroide?)
+                let isCollidingX = rocketRight > this.x && rocketLeft < this.x + asteroideLargura;
+
+                if (isCollidingX) {
+                    // Colisão Vertical (o foguete está batendo no topo OU no fundo?)
+                    // Bateu na parede superior
+                    if (rocketTop < this.topo) {
+                        return true;
+                    }
+                    // Bateu na parede inferior
+                    if (rocketBottom > this.fundo) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+    </script>
 </body>
 </html>
