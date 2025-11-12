@@ -2,26 +2,30 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Rocket Run Pro: Mestre do Espaço</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            margin: 0;
             background-color: #0a0014;
             font-family: Arial, sans-serif;
             color: white;
             overflow: hidden;
+            touch-action: none; /* Bloqueia zoom/scroll global */
         }
         canvas {
             display: block;
             border-radius: 12px;
             box-shadow: 0 0 30px rgba(255, 50, 50, 0.5);
             cursor: pointer;
+            touch-action: none !important;
+            position: relative;
+            z-index: 50;
         }
         .menu-container, .game-over-container {
             position: absolute;
@@ -34,15 +38,17 @@
             box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
             text-align: center;
             z-index: 100;
+            max-width: 90%;
         }
         .menu-container h1, .game-over-container h1 {
             color: #ff9900;
             margin-bottom: 25px;
-            font-size: 2.5rem;
+            font-size: 2.2rem;
         }
         .difficulty-button, .restart-button {
             display: block;
             width: 250px;
+            max-width: 90%;
             padding: 15px 20px;
             margin: 15px auto;
             border: none;
@@ -62,35 +68,44 @@
         .game-over-container h2 {
             color: #F44336;
             margin: 15px 0;
-            font-size: 1.8rem;
+            font-size: 1.6rem;
         }
         .score-display {
-            font-size: 1.4rem;
+            font-size: 1.3rem;
             color: #ccc;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
         .score-display span {
             color: #ffc107;
-            font-size: 1.8rem;
+            font-size: 1.7rem;
             font-weight: bold;
         }
         .hidden { display: none; }
         #controls-instruction {
             position: absolute;
             bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
             color: rgba(255, 255, 255, 0.7);
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             z-index: 10;
+            text-align: center;
+            max-width: 90%;
+        }
+        @media (max-width: 600px) {
+            .menu-container h1, .game-over-container h1 { font-size: 1.8rem; }
+            .difficulty-button, .restart-button { width: 80%; font-size: 1rem; }
+            #controls-instruction { font-size: 0.75rem; bottom: 10px; }
         }
     </style>
 </head>
 <body>
     <div id="menu-screen" class="menu-container">
         <h1>ROCKET RUN PRO</h1>
-        <p>SELECIONE O NÍVEL DE DIFICULDADE</p>
+        <p>SELECIONE O NÍVEL</p>
         <button class="difficulty-button easy" onclick="startGame('easy')">FÁCIL</button>
         <button class="difficulty-button medium" onclick="startGame('medium')">MÉDIO</button>
-        <button class="difficulty-button insane" onclick="startGame('insane')">ESTOU LOUCO</button>
+        <button class="difficulty-button insane" onclick="startGame('insane')">LOUCO</button>
     </div>
     <div id="gameover-screen" class="game-over-container hidden">
         <h1>MISSÃO FALHOU</h1>
@@ -100,7 +115,7 @@
         <button class="restart-button easy" onclick="showMenu()">REINICIAR</button>
     </div>
     <div id="controls-instruction">
-        Controles: WASD ou SETAS (Mover), Clique/Toque/ESPAÇO (Impulso Extra)
+        Controles: WASD ou SETAS (Mover), Toque/ESPAÇO (Impulso Extra)
     </div>
 
     <script>
@@ -126,17 +141,56 @@
         let autoPilotActive = false;
         const AUTOPILOT_DELAY = 120;
 
-        // Configurações de dificuldade
         const DIFICULDADE_CONFIG = {
             'easy': { grav: 0.1, abert: 200, y_thrust: -0.7, x_thrust: 0.5, max_speed: 4, scroll_base: 2, drag: 0.98 },
             'medium': { grav: 0.4, abert: 140, y_thrust: -1.0, x_thrust: 0.8, max_speed: 6, scroll_base: 4, drag: 0.97 },
             'insane': { grav: 0.8, abert: 100, y_thrust: -1.3, x_thrust: 1.2, max_speed: 8, scroll_base: 7, drag: 0.96 }
         };
 
-        // Variáveis de física (serão atualizadas ao iniciar)
         let gravidade, asteroideAbertura, y_thrust, x_thrust, max_speed, drag, velocidadeJogo;
 
-        const MENSAGENS_MOTIVACIONAIS = [ /* ... (mesmas mensagens) ... */ ];
+        const MENSAGENS_MOTIVACIONAIS = [
+            "Uau! Você é um ás da pilotagem! Avance para o próximo setor.",
+            "Impecável! Seu histórico de voo é perfeito. Continue assim!",
+            "Setor de Meio de Jogo: Você é imparável. A lenda diz que poucos chegam aqui!",
+            "Meta de 100 atingida! A velocidade da luz não é páreo para você.",
+            "Excelente manobra! Nem um grão de poeira espacial te parou.",
+            "Lenda em formação! O universo inteiro assiste ao seu voo.",
+            "Modo Turbo Ativado! Continue desviando com essa precisão.",
+            "Dupla Centena! Seu controle é absoluto. Mantenha o curso!",
+            "Pilotagem nível mestre. O próximo desafio espera!",
+            "Um Quarto do Caminho! Incrível! A recompensa está próxima.",
+            "A gravidade obedece a você. Siga em frente, comandante!",
+            "Três Centenas! Você está reescrevendo as regras da física.",
+            "Precisão Absoluta! Seu nome será gravado nas estrelas.",
+            "Que Voo! Você nem parece precisar de combustível.",
+            "Setor Crítico Superado! Nada pode te derrubar agora.",
+            "Quatro Centenas! Você está voando mais rápido que a informação.",
+            "Seu foco é lendário. Continue com essa determinação.",
+            "Mais um salto quântico em sua pontuação! Parabéns!",
+            "Nível de Reflexo: Divino! Mal posso acompanhar sua velocidade.",
+            "MEIO MILHÃO DE PONTOS! (Meio caminho para a glória!)",
+            "Retorno Triunfal! O universo inteiro celebra seu sucesso.",
+            "Maestria Total! Seu foguete parece deslizar no vácuo.",
+            "Nem mesmo um buraco negro ousaria te desafiar. Siga!",
+            "Seis Centenas! Que desempenho monumental.",
+            "Você é um Gênio Tático! Seus movimentos são perfeitos.",
+            "O Painel de Controle está em êxtase com sua performance.",
+            "Onde você aprendeu a voar assim? Absolutamente fabuloso!",
+            "Sete Centenas! A meta está logo ali, à vista!",
+            "Próximo Nível de Consciência: Você é a própria estrela.",
+            "Três Quartos do Caminho! A perseverança compensa.",
+            "Lançamento Bem Sucedido! Prepare-se para o final épico.",
+            "Oito Centenas! Os Deuses da Astrologia estão impressionados.",
+            "Você está em outra dimensão de pilotagem. Continue a magia!",
+            "Última Barreira de Setor! Você consegue ver o final?",
+            "Recorde de Velocidade Quebrado! Apenas você e o infinito.",
+            "Nove Centenas! Faltam apenas 100 para a Lenda!",
+            "Você está respirando no espaço com facilidade! Quase lá!",
+            "O Céu Não É o Limite! Continue ultrapassando expectativas.",
+            "PRÓXIMA PARADA: GLÓRIA! Apenas mais um passo...",
+            "NÍVEL LENDÁRIO ATINGIDO! Você é o MESTRE DO ESPAÇO!"
+        ];
 
         // === SETUP ===
         function setup() {
@@ -144,9 +198,10 @@
             let h = min(450, windowHeight);
             let canvas = createCanvas(w, h);
             canvas.parent(document.body);
-            canvas.elt.style.display = 'none'; // Esconde canvas no início
+            canvas.elt.style.display = 'none';
+            canvas.elt.style.touchAction = 'none';
+            canvas.elt.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
 
-            // Carrega recorde
             let saved = localStorage.getItem('rocketRunHighScore');
             if (saved) highScore = parseInt(saved);
 
@@ -155,15 +210,14 @@
             noStroke();
             frameRate(60);
 
-            // Estrelas
             for (let i = 0; i < 150; i++) {
                 estrelas.push({ x: random(width), y: random(height), size: random(1, 3), speed: random(0.5, 2) });
             }
 
-            noLoop(); // Importante: para o loop até iniciar o jogo
+            noLoop();
         }
 
-        // === FUNÇÕES DE MENU ===
+        // === MENU ===
         function showMenu() {
             gameState = 'menu';
             document.getElementById('menu-screen').classList.remove('hidden');
@@ -183,7 +237,6 @@
             max_speed = cfg.max_speed;
             drag = cfg.drag;
 
-            // Reset do jogo
             rocketX = width / 4;
             rocketY = height / 2;
             rocketXVel = rocketYVel = 0;
@@ -197,13 +250,12 @@
             lastActionTime = frameCount;
             autoPilotActive = false;
 
-            // UI
             document.getElementById('menu-screen').classList.add('hidden');
             document.getElementById('gameover-screen').classList.add('hidden');
             document.getElementById('controls-instruction').classList.add('hidden');
             select('canvas').elt.style.display = 'block';
 
-            loop(); // Inicia o jogo
+            loop();
         }
 
         // === DRAW ===
@@ -218,7 +270,6 @@
             drawStars();
 
             if (gameState === 'running') {
-                // Controles
                 const boost = (keys[' '] || keys[32] || isBoostActive);
                 if (boost) {
                     rocketYVel += y_thrust * 4;
@@ -246,7 +297,6 @@
                     if (autoPilotActive) rocketXVel += x_thrust * 0.2;
                 }
 
-                // Física
                 rocketYVel += gravidade;
                 rocketXVel *= drag;
                 rocketYVel *= drag;
@@ -258,11 +308,9 @@
                 rocketX = constrain(rocketX, 15, width - 15);
                 rocketY = constrain(rocketY, 15, height - 15);
 
-                // Velocidade do mundo
                 const xFactor = map(rocketX, width / 4, width - 15, 0, 1.5);
                 velocidadeJogo = DIFICULDADE_CONFIG[currentDifficulty].scroll_base + xFactor;
 
-                // Combustível
                 combustivel -= CONSUMO_POR_FRAME * (anyAction ? 2 : 1);
                 combustivel = constrain(combustivel, 0, MAX_COMBUSTIVEL);
                 if (combustivel <= 0) {
@@ -270,7 +318,6 @@
                     return;
                 }
 
-                // Asteroides
                 desenharFoguete(rocketX, rocketY, 30);
                 for (let i = asteroides.length - 1; i >= 0; i--) {
                     asteroides[i].mover(velocidadeJogo);
@@ -297,7 +344,6 @@
                     }
                 }
 
-                // Geração de asteroides
                 const spawnInterval = max(30, 100 - velocidadeJogo * 5);
                 if (frameCount % floor(spawnInterval) === 0) {
                     asteroides.push(new Asteroide());
@@ -309,7 +355,7 @@
             if (messageOverlay) drawMessageOverlay();
         }
 
-        // === INPUT ===
+        // === INPUT (TOQUE + CLIQUE + TECLADO) ===
         function keyPressed() {
             if (gameState === 'running') {
                 keys[key] = true;
@@ -324,6 +370,7 @@
                 keys[keyCode] = false;
             }
         }
+
         function mousePressed() {
             if (gameState === 'running') isBoostActive = true;
             else if (gameState === 'gameover') showMenu();
@@ -331,13 +378,20 @@
         function mouseReleased() {
             if (gameState === 'running') isBoostActive = false;
         }
+
         function touchStarted() {
-            if (gameState === 'running') isBoostActive = true;
-            else if (gameState === 'gameover') showMenu();
-            return false;
+            if (gameState === 'running') {
+                isBoostActive = true;
+            } else if (gameState === 'gameover') {
+                showMenu();
+            }
+            return false; // BLOQUEIA ZOOM/SCROLL
         }
         function touchEnded() {
-            if (gameState === 'running') isBoostActive = false;
+            if (gameState === 'running') {
+                isBoostActive = false;
+            }
+            return false;
         }
 
         // === FIM DE JOGO ===
@@ -355,13 +409,121 @@
             document.getElementById('gameover-screen').classList.remove('hidden');
         }
 
-        // === DEMAIS FUNÇÕES (inalteradas, apenas compactadas) ===
-        function drawBackgroundGradient() { /* ... mesmo código ... */ }
-        function drawStars() { /* ... mesmo código ... */ }
-        function drawHUD() { /* ... mesmo código ... */ }
-        function drawFuelGauge(x, y, h, w) { /* ... mesmo código ... */ }
-        function desenharFoguete(x, y, tamanho) { /* ... mesmo código ... */ }
-        function drawMessageOverlay() { /* ... mesmo código ... */ }
+        // === FUNÇÕES VISUAIS ===
+        function drawBackgroundGradient() {
+            push();
+            for (let y = 0; y < height; y++) {
+                let inter = map(y, 0, height, 0, 1);
+                let c = lerpColor(color(10, 0, 20), color(50, 0, 0), inter);
+                stroke(c);
+                line(0, y, width, y);
+            }
+            pop();
+        }
+
+        function drawStars() {
+            push();
+            fill(255);
+            for (let i = 0; i < estrelas.length; i++) {
+                let s = estrelas[i];
+                s.x -= s.speed * velocidadeJogo * 0.5;
+                if (s.x < 0) {
+                    s.x = width;
+                    s.y = random(height);
+                }
+                fill(i % 5 === 0 ? 255 : color(255, 100, 0, 150));
+                ellipse(s.x, s.y, s.size);
+            }
+            pop();
+        }
+
+        function drawHUD() {
+            push();
+            textSize(20 * (width / 800));
+            fill(255);
+            text("FOGUETE EM FUGA: ROTA DE SOBREVIVÊNCIA", width / 2, 25);
+            textSize(24 * (width / 800));
+            fill(255, 200, 0);
+            text(`SCORE: ${score}`, width - 100 * (width / 800), 60);
+            textSize(18 * (width / 800));
+            fill(255);
+            text(`RECORD: ${highScore}`, width - 100 * (width / 800), 90);
+
+            let corNivel = currentDifficulty === 'easy' ? color(100, 255, 100) : 
+                          currentDifficulty === 'medium' ? color(255, 255, 0) : color(255, 50, 50);
+            fill(corNivel);
+            textSize(18 * (width / 800));
+            text(`MODO: ${currentDifficulty.toUpperCase()}`, 100 * (width / 800), 60);
+
+            drawFuelGauge(40 * (width / 800), 90, 15, 200 * (width / 800));
+            textSize(14 * (width / 800));
+            fill(200, 200, 255);
+            text(`VELOCIDADE: ${nf(velocidadeJogo, 1, 1)}`, 100 * (width / 800), 115);
+            pop();
+        }
+
+        function drawFuelGauge(x, y, h, w) {
+            push();
+            textSize(14 * (width / 800));
+            fill(255);
+            text("COMBUSTÍVEL", x + w/2, y - 5);
+            fill(50);
+            stroke(255);
+            strokeWeight(1);
+            rect(x, y, w, h, 5);
+            let fuelW = map(combustivel, 0, MAX_COMBUSTIVEL, 0, w);
+            fill(combustivel < 20 ? color(255,0,0) : combustivel < 50 ? color(255,255,0) : color(0,200,0));
+            noStroke();
+            rect(x + 1, y + 1, fuelW - 2, h - 2, 4);
+            pop();
+        }
+
+        function desenharFoguete(x, y, t) {
+            push();
+            let alpha = map(combustivel, 0, MAX_COMBUSTIVEL, 50, 255);
+            let ang = map(rocketYVel, -max_speed, max_speed, radians(-20), radians(20));
+            translate(x, y);
+            rotate(ang);
+
+            if (rocketYVel < 0 || keys['w'] || keys['W'] || keys['ArrowUp'] || isBoostActive || keys[' '] || keys[32]) {
+                fill(255, 150, 0, alpha);
+                ellipse(-t/2 - 5, 0, 10 + random(5), 15 + random(10));
+            }
+
+            if (keys['a'] || keys['A'] || keys['ArrowLeft']) {
+                fill(0, 200, 255, alpha * 0.5);
+                rect(t/2 - 5, -t/2, 5, t);
+            } else if (keys['d'] || keys['D'] || keys['ArrowRight'] || (currentDifficulty === 'easy' && autoPilotActive)) {
+                fill(255, 100, 0, alpha * 0.5);
+                rect(-t/2 - 5, -t/2, 5, t);
+            }
+
+            noStroke();
+            fill(100);
+            triangle(-t/2 + 2, t/2 + 2, -t/2 + 2, -t/2 + 2, t/2 + 2, 2);
+            fill(180);
+            triangle(-t/2, -t/2, -t/2, t/2, t/2, 0);
+            fill(200, 50, 50);
+            triangle(t/2, 0, t/2 - 5, -5, t/2 - 5, 5);
+            pop();
+        }
+
+        function drawMessageOverlay() {
+            if (messageTimer > 0) {
+                push();
+                let alpha = 255;
+                if (messageTimer < 60) alpha = map(messageTimer, 0, 60, 0, 255);
+                else if (messageTimer > MESSAGE_DURATION - 60) alpha = map(messageTimer, MESSAGE_DURATION - 60, MESSAGE_DURATION, 0, 255);
+                fill(0, 0, 0, 200);
+                rect(0, height / 2 - 50, width, 100);
+                textSize(28 * (width / 800));
+                fill(255, 200, 0, alpha);
+                text(messageOverlay, width / 2, height / 2);
+                messageTimer--;
+                if (messageTimer <= 0) messageOverlay = null;
+                pop();
+            }
+        }
 
         class Asteroide {
             constructor() {
@@ -371,12 +533,23 @@
                 this.fundo = this.centroAbertura + asteroideAbertura / 2;
                 this.scored = false;
             }
-            desenhar() { /* ... mesmo código ... */ }
-            mover(vel) { this.x -= vel; }
+            desenhar() {
+                push();
+                fill(100, 100, 100);
+                rect(this.x, 0, asteroideLargura, this.topo);
+                fill(150, 150, 150, 100);
+                rect(this.x, 0, asteroideLargura, this.topo/4);
+                fill(100, 100, 100);
+                rect(this.x, this.fundo, asteroideLargura, height - this.fundo);
+                fill(150, 150, 150, 100);
+                rect(this.x, this.fundo, asteroideLargura, (height - this.fundo)/4);
+                pop();
+            }
+            mover(v) { this.x -= v; }
             checkCollision(rx, ry, rr) {
                 const rL = rx - rr, rR = rx + rr, rT = ry - rr, rB = ry + rr;
-                const collidingX = rR > this.x && rL < this.x + asteroideLargura;
-                return collidingX && (rT < this.topo || rB > this.fundo);
+                const xCol = rR > this.x && rL < this.x + asteroideLargura;
+                return xCol && (rT < this.topo || rB > this.fundo);
             }
         }
 
