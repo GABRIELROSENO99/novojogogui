@@ -16,19 +16,12 @@
             font-family: Arial, sans-serif;
             color: white;
             overflow: hidden;
-            touch-action: manipulation;
-            -webkit-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
         }
         canvas {
             display: block;
             border-radius: 12px;
             box-shadow: 0 0 30px rgba(255, 50, 50, 0.5);
             cursor: pointer;
-            touch-action: none;
-            position: relative;
-            z-index: 50;
         }
         .menu-container, .game-over-container {
             position: absolute;
@@ -41,7 +34,6 @@
             box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
             text-align: center;
             z-index: 100;
-            touch-action: manipulation;
         }
         .menu-container h1, .game-over-container h1 {
             color: #ff9900;
@@ -59,7 +51,6 @@
             font-weight: bold;
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
-            touch-action: manipulation;
         }
         .difficulty-button:hover, .restart-button:hover {
             transform: translateY(-3px);
@@ -92,11 +83,6 @@
             color: rgba(255, 255, 255, 0.7);
             font-size: 0.9rem;
             z-index: 10;
-            touch-action: manipulation;
-        }
-        /* Força o canvas a receber eventos de toque */
-        canvas {
-            -webkit-tap-highlight-color: transparent;
         }
     </style>
 </head>
@@ -120,24 +106,41 @@
         <button class="restart-button easy" onclick="showMenu()">REINICIAR</button>
     </div>
     <div id="controls-instruction">
-        Controles: Toque na tela para subir (impulso contínuo) | Solte para descer
+        Toque na tela para subir (celular) | WASD/setas/espaço (PC)
     </div>
 
     <script>
-        // === VARIÁVEIS GLOBAIS ===
-        let rocketX, rocketY, rocketXVel = 0, rocketYVel = 0;
+        // Global (mantido idêntico)
+        let rocketX;
+        let rocketY; 
+        let rocketXVel = 0;
+        let rocketYVel = 0;
         let combustivel;
         const MAX_COMBUSTIVEL = 100;
         const CONSUMO_POR_FRAME = 0.05;
-        let asteroides = [], score = 0, gameState = 'menu', motivoFimDeJogo = "", highScore = 0;
-        let estrelas = [], currentDifficulty = 'easy', asteroideLargura = 50;
+        let asteroides = [];
+        let score = 0;
+        let gameState = 'menu';
+        let motivoFimDeJogo = "";
+        let highScore = 0;
+        let estrelas = [];
+        let currentDifficulty = 'easy';
+        let asteroideLargura = 50;
         let isBoostActive = false;
-        let messageOverlay = null, messageTimer = 0;
+        let messageOverlay = null;
+        let messageTimer = 0;
         const MESSAGE_DURATION = 180;
         let keys = {};
-        let lastActionTime = 0, autoPilotActive = false;
+        let lastActionTime = 0;
+        let autoPilotActive = false;
         const AUTOPILOT_DELAY = 120;
-        let gravidade, asteroideAbertura, velocidadeJogo, y_thrust, x_thrust, max_speed, drag;
+        let gravidade;
+        let asteroideAbertura;
+        let velocidadeJogo;
+        let y_thrust;
+        let x_thrust;
+        let max_speed;
+        let drag;
 
         const MENSAGENS_MOTIVACIONAIS = [
             "Uau! Você é um ás da pilotagem! Avance para o próximo setor.",
@@ -188,21 +191,12 @@
             'insane': { grav: 0.8, abert: 100, y_thrust: -1.3, x_thrust: 1.2, max_speed: 8, scroll_base: 7, drag: 0.96 }
         };
 
-        // =========================================================
-        // SETUP
-        // =========================================================
         function setup() {
             let w = min(800, windowWidth);
             let h = min(450, windowHeight);
             let canvas = createCanvas(w, h);
             canvas.parent(document.body);
-
-            // Força eventos de toque no canvas
             canvas.elt.addEventListener('contextmenu', e => e.preventDefault());
-            canvas.elt.style.touchAction = 'none';
-            canvas.elt.addEventListener('touchstart', e => { e.preventDefault(); }, { passive: false });
-            canvas.elt.addEventListener('touchmove', e => { e.preventDefault(); }, { passive: false });
-            canvas.elt.addEventListener('touchend', e => { e.preventDefault(); }, { passive: false });
 
             let savedScore = localStorage.getItem('rocketRunHighScore');
             if (savedScore !== null) highScore = parseInt(savedScore);
@@ -261,9 +255,6 @@
             loop();
         }
 
-        // =========================================================
-        // DRAW
-        // =========================================================
         function draw() {
             if (gameState === 'menu') {
                 drawBackgroundGradient();
@@ -275,9 +266,7 @@
             drawStars();
 
             if (gameState === 'running') {
-                // === CONTROLES ===
                 const highBoostCondition = (keys[' '] || keys[32] || isBoostActive);
-
                 if (highBoostCondition) {
                     rocketYVel += y_thrust * 4.0;
                 } else if (keys['w'] || keys['W'] || keys['ArrowUp']) {
@@ -286,7 +275,6 @@
                 if (keys['s'] || keys['S'] || keys['ArrowDown']) {
                     rocketYVel -= y_thrust * 0.5;
                 }
-
                 let rightThrustApplied = false;
                 if (keys['d'] || keys['D'] || keys['ArrowRight']) {
                     rocketXVel += x_thrust;
@@ -296,7 +284,6 @@
                     rocketXVel -= x_thrust;
                 }
 
-                // Autopilot
                 let anyPlayerAction = (keys['w'] || keys['W'] || keys['ArrowUp'] || keys['s'] || keys['S'] || keys['ArrowDown'] || keys['a'] || keys['A'] || rightThrustApplied || highBoostCondition);
                 if (currentDifficulty === 'easy') {
                     if (anyPlayerAction) {
@@ -310,7 +297,6 @@
                     }
                 }
 
-                // === FÍSICA ===
                 rocketYVel += gravidade;
                 rocketXVel *= drag;
                 rocketYVel *= drag;
@@ -370,12 +356,12 @@
                 drawHUD();
             }
 
-            if (messageOverlay !== null) drawMessageOverlay();
+            if (messageOverlay !== null) {
+                drawMessageOverlay();
+            }
         }
 
-        // =========================================================
-        // INPUTS
-        // =========================================================
+        // INPUTS (SIMPLIFICADOS PARA MOBILE)
         function keyPressed() {
             if (gameState === 'running') {
                 keys[key] = true;
@@ -392,35 +378,38 @@
             }
         }
 
+        // MOUSE E TOQUE UNIFICADOS (p5.js mapeia toque para mouse no Chrome Android)
         function mousePressed() {
-            if (gameState === 'running') isBoostActive = true;
-            if (gameState === 'gameover') showMenu();
+            if (gameState === 'running') {
+                isBoostActive = true;
+            } else if (gameState === 'gameover') {
+                showMenu();
+            }
         }
 
         function mouseReleased() {
-            if (gameState === 'running') isBoostActive = false;
+            if (gameState === 'running') {
+                isBoostActive = false;
+            }
         }
 
+        // Toque como fallback (sem preventDefault para evitar bugs no Chrome Android)
         function touchStarted() {
             if (gameState === 'running') {
                 isBoostActive = true;
-            }
-            if (gameState === 'gameover') {
+            } else if (gameState === 'gameover') {
                 showMenu();
             }
-            return false;
+            // Sem return false para evitar bloqueio no Xiaomi Chrome
         }
 
         function touchEnded() {
             if (gameState === 'running') {
                 isBoostActive = false;
             }
-            return false;
+            // Sem return false
         }
 
-        // =========================================================
-        // FUNÇÕES AUXILIARES
-        // =========================================================
         function windowResized() {
             let w = min(800, windowWidth);
             let h = min(450, windowHeight);
@@ -450,15 +439,20 @@
             if (messageTimer > 0) {
                 push();
                 let alpha = 255;
-                if (messageTimer < 60) alpha = map(messageTimer, 0, 60, 0, 255);
-                else if (messageTimer > MESSAGE_DURATION - 60) alpha = map(messageTimer, MESSAGE_DURATION - 60, MESSAGE_DURATION, 0, 255);
+                if (messageTimer < 60) {
+                    alpha = map(messageTimer, 0, 60, 0, 255);
+                } else if (messageTimer > MESSAGE_DURATION - 60) {
+                    alpha = map(messageTimer, MESSAGE_DURATION - 60, MESSAGE_DURATION, 0, 255);
+                }
                 fill(0, 0, 0, 200);
                 rect(0, height / 2 - 50, width, 100);
                 textSize(28 * (width / 800));
                 fill(255, 200, 0, alpha);
                 text(messageOverlay, width / 2, height / 2);
                 messageTimer--;
-                if (messageTimer <= 0) messageOverlay = null;
+                if (messageTimer <= 0) {
+                    messageOverlay = null;
+                }
                 pop();
             }
         }
@@ -480,7 +474,10 @@
             for (let i = 0; i < estrelas.length; i++) {
                 let star = estrelas[i];
                 star.x -= star.speed * velocidadeJogo * 0.5;
-                if (star.x < 0) { star.x = width; star.y = random(height); }
+                if (star.x < 0) {
+                    star.x = width;
+                    star.y = random(height);
+                }
                 let c = (i % 5 === 0) ? color(255, 255, 255) : color(255, 100, 0, 150);
                 fill(c);
                 ellipse(star.x, star.y, star.size, star.size);
@@ -500,7 +497,14 @@
             fill(255, 255, 255);
             text(`RECORD: ${highScore}`, width - 100 * (width / 800), 90);
             let nivel = currentDifficulty.toUpperCase();
-            let corNivel = currentDifficulty === 'easy' ? color(100, 255, 100) : currentDifficulty === 'medium' ? color(255, 255, 0) : color(255, 50, 50);
+            let corNivel;
+            if (currentDifficulty === 'easy') {
+                corNivel = color(100, 255, 100);
+            } else if (currentDifficulty === 'medium') {
+                corNivel = color(255, 255, 0);
+            } else {
+                corNivel = color(255, 50, 50);
+            }
             fill(corNivel);
             textSize(18 * (width / 800));
             text(`MODO: ${nivel}`, 100 * (width / 800), 60);
@@ -521,7 +525,14 @@
             strokeWeight(1);
             rect(x, y, w, h, 5);
             let fuelWidth = map(combustivel, 0, MAX_COMBUSTIVEL, 0, w);
-            let fuelColor = combustivel < 20 ? color(255, 0, 0) : combustivel < 50 ? color(255, 255, 0) : color(0, 200, 0);
+            let fuelColor;
+            if (combustivel < 20) {
+                fuelColor = color(255, 0, 0);
+            } else if (combustivel < 50) {
+                fuelColor = color(255, 255, 0);
+            } else {
+                fuelColor = color(0, 200, 0);
+            }
             noStroke();
             fill(fuelColor);
             rect(x + 1, y + 1, fuelWidth - 2, h - 2, 4);
@@ -572,10 +583,14 @@
                 rect(this.x, this.fundo, asteroideLargura, height - this.fundo);
                 pop();
             }
-            mover(scrollSpeed) { this.x -= scrollSpeed; }
+            mover(scrollSpeed) {
+                this.x -= scrollSpeed;
+            }
             checkCollision(px, py, pr) {
                 if (px + pr > this.x && px - pr < this.x + asteroideLargura) {
-                    if (py - pr < this.topo || py + pr > this.fundo) return true;
+                    if (py - pr < this.topo || py + pr > this.fundo) {
+                        return true;
+                    }
                 }
                 return false;
             }
