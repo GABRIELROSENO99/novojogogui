@@ -16,12 +16,20 @@
             font-family: Arial, sans-serif;
             color: white;
             overflow: hidden;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
         }
         canvas {
             display: block;
             border-radius: 12px;
             box-shadow: 0 0 30px rgba(255, 50, 50, 0.5);
             cursor: pointer;
+            touch-action: none;
         }
         .menu-container, .game-over-container {
             position: absolute;
@@ -34,6 +42,7 @@
             box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
             text-align: center;
             z-index: 100;
+            touch-action: manipulation;
         }
         .menu-container h1, .game-over-container h1 {
             color: #ff9900;
@@ -51,6 +60,7 @@
             font-weight: bold;
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
+            touch-action: manipulation;
         }
         .difficulty-button:hover, .restart-button:hover {
             transform: translateY(-3px);
@@ -83,13 +93,14 @@
             color: rgba(255, 255, 255, 0.7);
             font-size: 0.9rem;
             z-index: 10;
+            text-align: center;
         }
     </style>
 </head>
 <body>
     <div id="menu-screen" class="menu-container">
         <h1>ROCKET RUN PRO</h1>
-        <p>SELECIONE O NÍVEL DE DIFICULDADE</p>
+        <p>TOQUE NA TELA PARA SUBIR</p>
         <button class="difficulty-button easy" onclick="startGame('easy')">FÁCIL</button>
         <button class="difficulty-button medium" onclick="startGame('medium')">MÉDIO</button>
         <button class="difficulty-button insane" onclick="startGame('insane')">ESTOU LOUCO (só para loucos)</button>
@@ -106,13 +117,12 @@
         <button class="restart-button easy" onclick="showMenu()">REINICIAR</button>
     </div>
     <div id="controls-instruction">
-        Toque na tela para subir (celular) | WASD/setas/espaço (PC)
+        TOQUE NA TELA PARA SUBIR 🚀
     </div>
-
     <script>
         // Global (mantido idêntico)
         let rocketX;
-        let rocketY; 
+        let rocketY;
         let rocketXVel = 0;
         let rocketYVel = 0;
         let combustivel;
@@ -130,7 +140,6 @@
         let messageOverlay = null;
         let messageTimer = 0;
         const MESSAGE_DURATION = 180;
-        let keys = {};
         let lastActionTime = 0;
         let autoPilotActive = false;
         const AUTOPILOT_DELAY = 120;
@@ -141,7 +150,6 @@
         let x_thrust;
         let max_speed;
         let drag;
-
         const MENSAGENS_MOTIVACIONAIS = [
             "Uau! Você é um ás da pilotagem! Avance para o próximo setor.",
             "Impecável! Seu histórico de voo é perfeito. Continue assim!",
@@ -184,35 +192,34 @@
             "PRÓXIMA PARADA: GLÓRIA! Apenas mais um passo...",
             "NÍVEL LENDÁRIO ATINGIDO! Você é o MESTRE DO ESPAÇO!"
         ];
-
         const DIFICULDADE_CONFIG = {
             'easy': { grav: 0.1, abert: 200, y_thrust: -0.7, x_thrust: 0.5, max_speed: 4, scroll_base: 2, drag: 0.98 },
             'medium': { grav: 0.4, abert: 140, y_thrust: -1.0, x_thrust: 0.8, max_speed: 6, scroll_base: 4, drag: 0.97 },
             'insane': { grav: 0.8, abert: 100, y_thrust: -1.3, x_thrust: 1.2, max_speed: 8, scroll_base: 7, drag: 0.96 }
         };
-
+        
         function setup() {
             let w = min(800, windowWidth);
             let h = min(450, windowHeight);
             let canvas = createCanvas(w, h);
             canvas.parent(document.body);
             canvas.elt.addEventListener('contextmenu', e => e.preventDefault());
-
+            canvas.elt.addEventListener('selectstart', e => e.preventDefault());
+            
             let savedScore = localStorage.getItem('rocketRunHighScore');
             if (savedScore !== null) highScore = parseInt(savedScore);
-
+            
             textAlign(CENTER, CENTER);
             textFont('Arial');
             noStroke();
             frameRate(60);
-
+            
             for (let i = 0; i < 150; i++) {
                 estrelas.push({ x: random(width), y: random(height), size: random(1, 3), speed: random(0.5, 2) });
             }
-
             canvas.elt.style.display = 'none';
         }
-
+        
         function showMenu() {
             gameState = 'menu';
             document.getElementById('menu-screen').classList.remove('hidden');
@@ -221,7 +228,7 @@
             let canvas = select('canvas');
             if (canvas) canvas.elt.style.display = 'none';
         }
-
+        
         function startGame(difficulty) {
             currentDifficulty = difficulty;
             const config = DIFICULDADE_CONFIG[difficulty];
@@ -231,7 +238,7 @@
             x_thrust = config.x_thrust;
             max_speed = config.max_speed;
             drag = config.drag;
-
+            
             rocketX = width / 4;
             rocketY = height / 2;
             rocketXVel = 0;
@@ -242,11 +249,10 @@
             asteroides.push(new Asteroide());
             gameState = 'running';
             messageOverlay = null;
-            keys = {};
             isBoostActive = false;
             lastActionTime = frameCount;
             autoPilotActive = false;
-
+            
             document.getElementById('menu-screen').classList.add('hidden');
             document.getElementById('gameover-screen').classList.add('hidden');
             document.getElementById('controls-instruction').classList.add('hidden');
@@ -254,39 +260,28 @@
             if (canvas) canvas.elt.style.display = 'block';
             loop();
         }
-
+        
         function draw() {
             if (gameState === 'menu') {
                 drawBackgroundGradient();
                 drawStars();
                 return;
             }
-
+            
             drawBackgroundGradient();
             drawStars();
-
+            
             if (gameState === 'running') {
-                const highBoostCondition = (keys[' '] || keys[32] || isBoostActive);
-                if (highBoostCondition) {
-                    rocketYVel += y_thrust * 4.0;
-                } else if (keys['w'] || keys['W'] || keys['ArrowUp']) {
-                    rocketYVel += y_thrust;
+                // CONTROLE SIMPLIFICADO: APENAS TOQUE/CLIQUE PARA SUBIR
+                let playerAction = isBoostActive;
+                
+                if (playerAction) {
+                    rocketYVel += y_thrust * 2.5; // Thrust principal do toque
                 }
-                if (keys['s'] || keys['S'] || keys['ArrowDown']) {
-                    rocketYVel -= y_thrust * 0.5;
-                }
-                let rightThrustApplied = false;
-                if (keys['d'] || keys['D'] || keys['ArrowRight']) {
-                    rocketXVel += x_thrust;
-                    rightThrustApplied = true;
-                }
-                if (keys['a'] || keys['A'] || keys['ArrowLeft']) {
-                    rocketXVel -= x_thrust;
-                }
-
-                let anyPlayerAction = (keys['w'] || keys['W'] || keys['ArrowUp'] || keys['s'] || keys['S'] || keys['ArrowDown'] || keys['a'] || keys['A'] || rightThrustApplied || highBoostCondition);
+                
+                // Auto-pilot apenas no modo fácil
                 if (currentDifficulty === 'easy') {
-                    if (anyPlayerAction) {
+                    if (playerAction) {
                         autoPilotActive = false;
                         lastActionTime = frameCount;
                     } else if (frameCount > lastActionTime + AUTOPILOT_DELAY) {
@@ -296,45 +291,53 @@
                         rocketXVel += x_thrust * 0.2;
                     }
                 }
-
+                
+                // Física do jogo
                 rocketYVel += gravidade;
                 rocketXVel *= drag;
                 rocketYVel *= drag;
+                
                 rocketXVel = constrain(rocketXVel, -max_speed, max_speed);
                 rocketYVel = constrain(rocketYVel, -max_speed, max_speed);
-
+                
                 rocketX += rocketXVel;
                 rocketY += rocketYVel;
+                
                 rocketX = constrain(rocketX, 15, width - 15);
                 rocketY = constrain(rocketY, 15, height - 15);
-
+                
                 let xFactor = map(rocketX, width / 4, width - 15, 0, 1.5);
                 velocidadeJogo = DIFICULDADE_CONFIG[currentDifficulty].scroll_base + xFactor;
-
-                let currentConsumption = CONSUMO_POR_FRAME * (anyPlayerAction ? 2 : 1);
+                
+                let currentConsumption = CONSUMO_POR_FRAME * (playerAction ? 2 : 1);
                 combustivel -= currentConsumption;
                 combustivel = constrain(combustivel, 0, MAX_COMBUSTIVEL);
-
+                
                 if (combustivel <= 0) {
                     endGame("ACABOU O COMBUSTÍVEL!");
                     return;
                 }
-
+                
                 desenharFoguete(rocketX, rocketY, 30);
-
+                
+                // Lógica dos asteroides
                 for (let i = asteroides.length - 1; i >= 0; i--) {
                     asteroides[i].mover(velocidadeJogo);
                     asteroides[i].desenhar();
+                    
                     if (asteroides[i].checkCollision(rocketX, rocketY, 15)) {
                         endGame("COLISÃO COM ASTEROIDE!");
                     }
+                    
                     if (asteroides[i].x < -asteroideLargura) {
                         asteroides.splice(i, 1);
                     }
+                    
                     if (!asteroides[i].scored && rocketX > asteroides[i].x + asteroideLargura) {
                         score++;
                         combustivel = MAX_COMBUSTIVEL;
                         asteroides[i].scored = true;
+                        
                         if (score > 0 && score % 25 === 0 && score <= 1000) {
                             let index = (score / 25) - 1;
                             if (index < MENSAGENS_MOTIVACIONAIS.length) {
@@ -344,72 +347,60 @@
                         }
                     }
                 }
-
+                
                 let spawnInterval = max(30, 100 - (velocidadeJogo * 5));
                 if (frameCount % floor(spawnInterval) === 0) {
                     asteroides.push(new Asteroide());
                 }
-
+                
                 drawHUD();
             } else if (gameState === 'gameover') {
                 desenharFoguete(rocketX, rocketY, 30);
                 drawHUD();
             }
-
+            
             if (messageOverlay !== null) {
                 drawMessageOverlay();
             }
         }
-
-        // INPUTS (SIMPLIFICADOS PARA MOBILE)
-        function keyPressed() {
-            if (gameState === 'running') {
-                keys[key] = true;
-                keys[keyCode] = true;
-            } else if (gameState === 'gameover' && (key === ' ' || keyCode === 32)) {
-                showMenu();
-            }
-        }
-
-        function keyReleased() {
-            if (gameState === 'running') {
-                keys[key] = false;
-                keys[keyCode] = false;
-            }
-        }
-
-        // MOUSE E TOQUE UNIFICADOS (p5.js mapeia toque para mouse no Chrome Android)
+        
+        // CONTROLES UNIFICADOS PARA MOBILE E PC
         function mousePressed() {
             if (gameState === 'running') {
                 isBoostActive = true;
+                return false;
             } else if (gameState === 'gameover') {
                 showMenu();
+                return false;
             }
         }
-
+        
         function mouseReleased() {
             if (gameState === 'running') {
                 isBoostActive = false;
             }
+            return false;
         }
-
-        // Toque como fallback (sem preventDefault para evitar bugs no Chrome Android)
+        
         function touchStarted() {
             if (gameState === 'running') {
                 isBoostActive = true;
+                return false;
             } else if (gameState === 'gameover') {
                 showMenu();
+                return false;
             }
-            // Sem return false para evitar bloqueio no Xiaomi Chrome
         }
-
+        
         function touchEnded() {
             if (gameState === 'running') {
                 isBoostActive = false;
             }
-            // Sem return false
+            return false;
         }
-
+        
+        // Remove completamente keyPressed e keyReleased
+        
         function windowResized() {
             let w = min(800, windowWidth);
             let h = min(450, windowHeight);
@@ -420,7 +411,7 @@
                 canvas.elt.style.top = `${(windowHeight - h) / 2}px`;
             }
         }
-
+        
         function endGame(motivo) {
             motivoFimDeJogo = motivo;
             gameState = 'gameover';
@@ -434,7 +425,7 @@
             document.getElementById('high-score').innerText = highScore;
             document.getElementById('gameover-screen').classList.remove('hidden');
         }
-
+        
         function drawMessageOverlay() {
             if (messageTimer > 0) {
                 push();
@@ -456,7 +447,7 @@
                 pop();
             }
         }
-
+        
         function drawBackgroundGradient() {
             push();
             for (let y = 0; y < height; y++) {
@@ -467,7 +458,7 @@
             }
             pop();
         }
-
+        
         function drawStars() {
             push();
             fill(255);
@@ -484,7 +475,7 @@
             }
             pop();
         }
-
+        
         function drawHUD() {
             push();
             textSize(20 * (width / 800));
@@ -496,6 +487,7 @@
             textSize(18 * (width / 800));
             fill(255, 255, 255);
             text(`RECORD: ${highScore}`, width - 100 * (width / 800), 90);
+            
             let nivel = currentDifficulty.toUpperCase();
             let corNivel;
             if (currentDifficulty === 'easy') {
@@ -508,13 +500,14 @@
             fill(corNivel);
             textSize(18 * (width / 800));
             text(`MODO: ${nivel}`, 100 * (width / 800), 60);
+            
             drawFuelGauge(40 * (width / 800), 90, 15, 200 * (width / 800));
             textSize(14 * (width / 800));
             fill(200, 200, 255);
             text(`VELOCIDADE: ${nf(velocidadeJogo, 1, 1)}`, 100 * (width / 800), 115);
             pop();
         }
-
+        
         function drawFuelGauge(x, y, h, w) {
             push();
             textSize(14 * (width / 800));
@@ -538,24 +531,26 @@
             rect(x + 1, y + 1, fuelWidth - 2, h - 2, 4);
             pop();
         }
-
+        
         function desenharFoguete(x, y, tamanho) {
             push();
             let rastroAlpha = map(combustivel, 0, MAX_COMBUSTIVEL, 50, 255);
             let rotationAngle = map(rocketYVel, -max_speed, max_speed, radians(-20), radians(20));
             translate(x, y);
             rotate(rotationAngle);
-            if (rocketYVel < 0 || keys['w'] || keys['W'] || keys['ArrowUp'] || isBoostActive || keys[' '] || keys[32]) {
+            
+            // Chama principal (sempre quando tocando)
+            if (isBoostActive) {
                 fill(255, 150, 0, rastroAlpha);
                 ellipse(-tamanho/2 - 5, 0, 10 + random(0, 5), 15 + random(0, 10));
             }
-            if (keys['a'] || keys['A'] || keys['ArrowLeft']) {
-                fill(0, 200, 255, rastroAlpha * 0.5);
-                rect(tamanho/2 - 5, -tamanho/2, 5, tamanho);
-            } else if (keys['d'] || keys['D'] || keys['ArrowRight'] || (currentDifficulty === 'easy' && autoPilotActive)) {
+            
+            // Auto-pilot visual (apenas easy)
+            if (currentDifficulty === 'easy' && autoPilotActive) {
                 fill(255, 100, 0, rastroAlpha * 0.5);
                 rect(-tamanho/2 - 5, -tamanho/2, 5, tamanho);
             }
+            
             noStroke();
             fill(100);
             triangle(-tamanho/2 + 2, tamanho/2 + 2, -tamanho/2 + 2, -tamanho/2 + 2, tamanho/2 + 2, 2);
@@ -565,7 +560,7 @@
             triangle(tamanho/2, 0, tamanho/2 - 5, -5, tamanho/2 - 5, 5);
             pop();
         }
-
+        
         class Asteroide {
             constructor() {
                 this.x = width;
@@ -574,6 +569,7 @@
                 this.fundo = this.centroAbertura + asteroideAbertura / 2;
                 this.scored = false;
             }
+            
             desenhar() {
                 push();
                 stroke(200, 50, 50);
@@ -583,9 +579,11 @@
                 rect(this.x, this.fundo, asteroideLargura, height - this.fundo);
                 pop();
             }
+            
             mover(scrollSpeed) {
                 this.x -= scrollSpeed;
             }
+            
             checkCollision(px, py, pr) {
                 if (px + pr > this.x && px - pr < this.x + asteroideLargura) {
                     if (py - pr < this.topo || py + pr > this.fundo) {
