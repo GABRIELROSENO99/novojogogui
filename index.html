@@ -42,8 +42,7 @@
             touch-action: auto; /* Permite o toque nos botões */
         }
 
-        /* ... (Mantenha os estilos de h1, buttons, hidden, etc. do código anterior aqui) ... */
-
+        /* Mantendo os estilos de botões para o HTML overlay */
         .overlay-container h1 { color: #ff9900; margin-bottom: 25px; font-size: 2.5rem; }
         .difficulty-button, .restart-button {
             display: block; width: 250px; padding: 15px 20px; margin: 15px auto; border: none;
@@ -117,9 +116,9 @@
         const ROCKET_RADIUS = 15; // Usado para detecção de colisão
 
         // Variáveis de Controle
-        let keys = {}; // Estado das teclas pressionadas
-        let isBoostActive = false; // Estado do toque/clique (Impulso Extra Contínuo)
-        let animationFrameId; // Para gerenciar o requestAnimationFrame
+        let keys = {}; 
+        let isBoostActive = false; 
+        let animationFrameId; 
 
         // Variáveis de Dificuldade
         let gravidade;
@@ -131,17 +130,15 @@
         let drag; 
         const asteroideLargura = 50;
 
-        // Configurações de Dificuldade (Mantidas do p5.js)
+        // Configurações de Dificuldade
         const DIFICULDADE_CONFIG = {
             'easy': { grav: 0.1, abert: 200, y_thrust: -0.7, x_thrust: 0.5, max_speed: 4, scroll_base: 2, drag: 0.98 },
             'medium': { grav: 0.4, abert: 140, y_thrust: -1.0, x_thrust: 0.8, max_speed: 6, scroll_base: 4, drag: 0.97 },
             'insane': { grav: 0.8, abert: 100, y_thrust: -1.3, x_thrust: 1.2, max_speed: 8, scroll_base: 7, drag: 0.96 }
         };
         
-        // ... (Mensagens Motivacionais omitidas para brevidade, mas devem ser incluídas) ...
-
         // =========================================================
-        // CLASSE ASTEROIDE (ADAPTADA PARA CANVAS PURO)
+        // CLASSE ASTEROIDE (ALTERADA - SEM LINHAS AMARELAS)
         // =========================================================
         class Asteroide {
             constructor() {
@@ -160,24 +157,13 @@
                 // Desenha Retângulo Inferior
                 ctx.fillRect(this.x, this.fundo, asteroideLargura, HEIGHT - this.fundo);
 
-                // Efeito Neon na Abertura (semelhante ao p5.js)
-                if (!this.scored) {
-                    ctx.strokeStyle = 'rgba(255, 200, 0, 0.6)';
-                    ctx.lineWidth = 3;
-                    ctx.beginPath();
-                    ctx.moveTo(this.x, this.topo);
-                    ctx.lineTo(this.x, this.fundo);
-                    ctx.moveTo(this.x + asteroideLargura, this.topo);
-                    ctx.lineTo(this.x + asteroideLargura, this.fundo);
-                    ctx.stroke();
-                }
+                // *** BLOCO DAS LINHAS AMARELAS REMOVIDO ***
             }
 
             mover(vel) {
                 this.x -= vel;
             }
 
-            // Lógica de Colisão (Adaptada para Canvas/Retângulos)
             checkCollision(fx, fy, fr) {
                 // Colisão Vertical (Teto e Chão)
                 if (fx > this.x && fx < this.x + asteroideLargura) {
@@ -185,11 +171,8 @@
                         return true;
                     }
                 }
-                // Colisão Horizontal (Bordas de entrada e saída)
-                // Usando a lógica simples de colisão circular com as quinas
-                // Quinas do topo
+                // Colisão Circular com Quinas
                 if (Math.hypot(fx - this.x, fy - this.topo) < fr || Math.hypot(fx - (this.x + asteroideLargura), fy - this.topo) < fr) return true;
-                // Quinas do fundo
                 if (Math.hypot(fx - this.x, fy - this.fundo) < fr || Math.hypot(fx - (this.x + asteroideLargura), fy - this.fundo) < fr) return true;
                 
                 return false;
@@ -204,7 +187,6 @@
             currentDifficulty = difficulty;
             const config = DIFICULDADE_CONFIG[difficulty];
 
-            // Aplica as configurações
             gravidade = config.grav;
             asteroideAbertura = config.abert;
             y_thrust = config.y_thrust;
@@ -212,7 +194,6 @@
             max_speed = config.max_speed;
             drag = config.drag;
             
-            // Inicializa estado de jogo
             rocketX = WIDTH / 4; 
             rocketY = HEIGHT / 2;
             rocketXVel = 0;
@@ -222,13 +203,11 @@
             combustivel = MAX_COMBUSTIVEL;
             gameState = 'running';
 
-            // Esconde menus, mostra canvas
             document.getElementById('menu-screen').classList.add('hidden');
             document.getElementById('gameover-screen').classList.add('hidden');
             document.getElementById('controls-instruction').classList.add('hidden');
             canvas.style.display = 'block';
 
-            // Inicia o Loop do Jogo
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             gameLoop();
         }
@@ -241,15 +220,13 @@
                 localStorage.setItem('rocketRunHighScore', highScore);
             }
             
-            // Para o loop de animação
             cancelAnimationFrame(animationFrameId); 
 
-            // Exibe a tela de Game Over HTML
             document.getElementById('gameover-reason').innerText = motivo;
             document.getElementById('final-score').innerText = score;
             document.getElementById('high-score').innerText = highScore;
             document.getElementById('gameover-screen').classList.remove('hidden');
-            canvas.style.display = 'none'; // Esconde o canvas
+            canvas.style.display = 'none'; 
         }
 
         function showMenu() {
@@ -264,10 +241,8 @@
         function gameLoop() {
             if (gameState !== 'running') return;
             
-            // Limpa a tela
             drawBackground(); 
 
-            // Lógica de Física e Controle (similar ao p5.js, mas com Math.constrain)
             const highBoostCondition = (keys[' '] || keys[32] || isBoostActive);
             const anyPlayerAction = (keys['w'] || keys['ArrowUp'] || keys['s'] || keys['ArrowDown'] || keys['a'] || keys['ArrowLeft'] || keys['d'] || keys['ArrowRight'] || highBoostCondition);
 
@@ -278,33 +253,26 @@
             if (keys['d'] || keys['ArrowRight']) rocketXVel += x_thrust;
             if (keys['a'] || keys['ArrowLeft']) rocketXVel -= x_thrust;
 
-            // Gravidade e Fricção
             rocketYVel += gravidade;
             rocketXVel *= drag;
             rocketYVel *= drag;
 
-            // Limita Velocidade (Math.min, Math.max)
             rocketXVel = Math.max(-max_speed, Math.min(max_speed, rocketXVel));
             rocketYVel = Math.max(-max_speed, Math.min(max_speed, rocketYVel));
             
-            // Atualiza Posição e Colisão com as Bordas
             rocketX += rocketXVel;
             rocketY += rocketYVel;
             
-            // Colisão com bordas (contrain nativo)
             rocketX = Math.max(ROCKET_RADIUS, Math.min(WIDTH - ROCKET_RADIUS, rocketX));
             rocketY = Math.max(ROCKET_RADIUS, Math.min(HEIGHT - ROCKET_RADIUS, rocketY));
 
-            // Velocidade do Mundo (Baseada na posição X do foguete)
             let xFactor = (rocketX - WIDTH / 4) / (WIDTH - 15 - WIDTH / 4) * 1.5;
             velocidadeJogo = DIFICULDADE_CONFIG[currentDifficulty].scroll_base + Math.max(0, xFactor);
 
-            // Consumo de Combustível
             combustivel -= CONSUMO_POR_FRAME * (anyPlayerAction ? 2 : 1);
             combustivel = Math.max(0, Math.min(MAX_COMBUSTIVEL, combustivel)); 
             if (combustivel <= 0) { endGame("ACABOU O COMBUSTÍVEL!"); return; }
 
-            // Lógica e Movimento dos Asteroides
             for (let i = asteroides.length - 1; i >= 0; i--) {
                 asteroides[i].mover(velocidadeJogo);
                 asteroides[i].desenhar();
@@ -318,22 +286,18 @@
                     asteroides.splice(i, 1);
                 }
                 
-                // Pontuação e Recarga
                 if (!asteroides[i].scored && rocketX > asteroides[i].x + asteroideLargura) {
                     score++; 
                     combustivel = MAX_COMBUSTIVEL;
                     asteroides[i].scored = true;
-                    // Lógica de Mensagens Motivacionais (omitida)
                 }
             }
 
-            // Gera novos asteroides
             let spawnInterval = Math.max(30, 100 - (velocidadeJogo * 5)); 
             if (Math.floor(Date.now() / 16.6) % Math.floor(spawnInterval) === 0) { 
                 asteroides.push(new Asteroide());
             }
 
-            // Desenho
             drawRocket(rocketX, rocketY, ROCKET_RADIUS * 2);
             drawHUD();
 
@@ -341,18 +305,16 @@
         }
 
         // =========================================================
-        // FUNÇÕES DE DESENHO (ADAPTADAS PARA CANVAS PURO)
+        // FUNÇÕES DE DESENHO
         // =========================================================
 
         function drawBackground() {
-            // Desenha um gradiente de fundo simples
             const gradient = ctx.createLinearGradient(0, 0, 0, HEIGHT);
             gradient.addColorStop(0, 'rgb(10, 0, 20)');
             gradient.addColorStop(1, 'rgb(50, 0, 0)');
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, WIDTH, HEIGHT);
             
-            // Desenho de Estrelas (Simplificado)
             ctx.fillStyle = 'white';
             for (let i = 0; i < estrelas.length; i++) {
                 let star = estrelas[i];
@@ -366,18 +328,15 @@
         }
 
         function drawRocket(x, y, tamanho) {
-            // CÁLCULO DE ROTAÇÃO (Pitch)
-            const rotationAngle = (rocketYVel / max_speed) * (Math.PI / 8); // Máximo +/- 22.5 graus
+            const rotationAngle = (rocketYVel / max_speed) * (Math.PI / 8);
 
             ctx.save();
             ctx.translate(x, y);
             ctx.rotate(rotationAngle);
             
-            // Rastro de Propulsão (se boost ativo)
             if (isBoostActive || keys['w'] || keys['ArrowUp'] || keys[' '] || keys[32]) {
                 ctx.fillStyle = 'orange';
                 ctx.beginPath();
-                // Fogo: Triângulo atrás do corpo principal
                 ctx.moveTo(-tamanho/2, 0);
                 ctx.lineTo(-tamanho/2 - 5 - Math.random() * 5, -5 - Math.random() * 2);
                 ctx.lineTo(-tamanho/2 - 5 - Math.random() * 5, 5 + Math.random() * 2);
@@ -385,16 +344,14 @@
                 ctx.fill();
             }
 
-            // Corpo do Foguete (Triângulo)
             ctx.fillStyle = 'rgb(180, 180, 180)';
             ctx.beginPath();
-            ctx.moveTo(tamanho/2, 0); // Ponta
-            ctx.lineTo(-tamanho/2, -tamanho/2); // Asa superior
-            ctx.lineTo(-tamanho/2, tamanho/2); // Asa inferior
+            ctx.moveTo(tamanho/2, 0); 
+            ctx.lineTo(-tamanho/2, -tamanho/2); 
+            ctx.lineTo(-tamanho/2, tamanho/2); 
             ctx.closePath();
             ctx.fill();
             
-            // Ponta Vermelha
             ctx.fillStyle = 'rgb(200, 50, 50)';
             ctx.beginPath();
             ctx.arc(tamanho/2 - 3, 0, 3, 0, Math.PI * 2);
@@ -407,23 +364,19 @@
             ctx.save();
             ctx.textAlign = 'center';
             
-            // TÍTULO
             ctx.font = '20px Arial';
             ctx.fillStyle = 'white';
             ctx.fillText("FOGUETE EM FUGA", WIDTH / 2, 25);
             
-            // PONTUAÇÃO
             ctx.textAlign = 'right';
             ctx.font = '24px Arial';
             ctx.fillStyle = 'rgb(255, 200, 0)';
             ctx.fillText(`SCORE: ${score}`, WIDTH - 20, 40);
             
-            // RECORDE
             ctx.font = '18px Arial';
             ctx.fillStyle = 'white';
             ctx.fillText(`RECORD: ${highScore}`, WIDTH - 20, 65);
 
-            // COMBUSTÍVEL
             ctx.textAlign = 'left';
             drawFuelGauge(20, 80, 15, 200);
 
@@ -431,14 +384,12 @@
         }
 
         function drawFuelGauge(x, y, h, w) {
-            // Fundo da barra
             ctx.fillStyle = 'rgb(50, 50, 50)';
             ctx.strokeStyle = 'white';
             ctx.lineWidth = 1;
             ctx.fillRect(x, y, w, h);
             ctx.strokeRect(x, y, w, h); 
             
-            // Barra de Combustível
             let fuelWidth = (combustivel / MAX_COMBUSTIVEL) * w;
             let fuelColor = combustivel < 20 ? 'red' : combustivel < 50 ? 'yellow' : 'green';
             ctx.fillStyle = fuelColor;
@@ -453,9 +404,8 @@
         // FUNÇÕES DE EVENTOS (CONTROLE MÁXIMO)
         // =========================================================
 
-        // Bloqueio Crítico do Toque e Estado de Boost
         function handleTouch(event) {
-            event.preventDefault(); // BLOQUEIO MÁXIMO
+            event.preventDefault(); 
             
             if (event.type.includes('start') || event.type === 'mousedown') {
                 isBoostActive = true;
@@ -466,7 +416,6 @@
             }
         }
 
-        // Teclado
         document.addEventListener('keydown', (e) => {
             keys[e.key] = true;
             if (gameState === 'gameover' && e.key === ' ') showMenu();
@@ -476,13 +425,12 @@
             keys[e.key] = false;
         });
 
-        // Event Listeners MÓVEIS (A prova de falhas)
         canvas.addEventListener('touchstart', handleTouch, { passive: false });
         canvas.addEventListener('touchend', handleTouch, { passive: false });
         canvas.addEventListener('mousedown', handleTouch, false);
         canvas.addEventListener('mouseup', handleTouch, false);
         
-        // Inicialização de Estrelas e High Score
+        // Inicialização
         for(let i = 0; i < 150; i++) {
             estrelas.push({ 
                 x: Math.random() * WIDTH, 
@@ -494,7 +442,6 @@
         let savedScore = localStorage.getItem('rocketRunHighScore');
         if (savedScore !== null) highScore = parseInt(savedScore);
 
-        // Início (Mostra o Menu)
         showMenu();
 
     </script>
