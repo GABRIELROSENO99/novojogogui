@@ -1,7 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
-    <title>Teste de Toque Puro (Vanilla JS)</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rocket Run Pro: Mestre do Espaço (Canvas Puro)</title>
     <style>
         body {
             /* ESSENCIAL: BLOQUEIO GLOBAL DE ROLAGEM */
@@ -13,101 +15,488 @@
             align-items: center;
             min-height: 100vh;
             background-color: #0a0014;
+            font-family: Arial, sans-serif;
+            color: white;
         }
         #gameCanvas {
-            border: 2px solid #fff;
+            display: none; /* Inicialmente oculto, o JS mostra quando o jogo começa */
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(255, 50, 50, 0.5); 
             background-color: #000;
+            cursor: pointer;
+            touch-action: none;
         }
+
+        /* Estilos do Menu/Game Over (DOM overlay) */
+        .overlay-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 30px;
+            background: rgba(0, 0, 0, 0.85);
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+            text-align: center;
+            z-index: 100;
+            touch-action: auto; /* Permite o toque nos botões */
+        }
+
+        /* ... (Mantenha os estilos de h1, buttons, hidden, etc. do código anterior aqui) ... */
+
+        .overlay-container h1 { color: #ff9900; margin-bottom: 25px; font-size: 2.5rem; }
+        .difficulty-button, .restart-button {
+            display: block; width: 250px; padding: 15px 20px; margin: 15px auto; border: none;
+            border-radius: 8px; font-size: 1.2rem; font-weight: bold; cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .difficulty-button:hover, .restart-button:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3); }
+        .easy { background-color: #00A389; color: white; } 
+        .medium { background-color: #ffc107; color: #333; } 
+        .insane { background-color: #F44336; color: white; } 
+        .game-over-container h2 { color: #F44336; margin: 15px 0; font-size: 1.8rem; }
+        .score-display { font-size: 1.4rem; color: #ccc; margin-bottom: 20px; }
+        .score-display span { color: #ffc107; font-size: 1.8rem; font-weight: bold; }
+        .hidden { display: none; }
+        #controls-instruction {
+            position: absolute; bottom: 20px; color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem; z-index: 10;
+        }
+
     </style>
 </head>
 <body>
 
     <canvas id="gameCanvas" width="800" height="450"></canvas>
 
+    <div id="menu-screen" class="overlay-container">
+        <h1>ROCKET RUN PRO</h1>
+        <p>SELECIONE O NÍVEL DE DIFICULDADE</p>
+        <button class="difficulty-button easy" onclick="startGame('easy')">FÁCIL</button>
+        <button class="difficulty-button medium" onclick="startGame('medium')">MÉDIO</button>
+        <button class="difficulty-button insane" onclick="startGame('insane')">ESTOU LOUCO</button>
+    </div>
+
+    <div id="gameover-screen" class="overlay-container hidden">
+        <h1>MISSÃO FALHOU</h1>
+        <h2 id="gameover-reason"></h2>
+        <div class="score-display">
+            Pontuação: <span id="final-score">0</span>
+        </div>
+        <div class="score-display">
+            Recorde: <span id="high-score">0</span>
+        </div>
+        <button class="restart-button easy" onclick="showMenu()">REINICIAR</button>
+    </div>
+
+    <div id="controls-instruction">
+        Controles: WASD ou SETAS (Mover), Clique/Toque/ESPAÇO (Impulso Extra Contínuo)
+    </div>
+    
     <script>
+        // Variáveis do Canvas e Contexto
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const WIDTH = canvas.width;
+        const HEIGHT = canvas.height;
 
-        let rocketY = canvas.height / 2;
-        let isTouching = false; // Estado do toque
-        let gravity = 0.5;
-        let yVelocity = 0;
-        const thrust = -5; // Impulso para cima
+        // Variáveis Globais de Jogo
+        let rocketX;
+        let rocketY; 
+        let rocketXVel = 0;
+        let rocketYVel = 0;
+        let combustivel;
+        const MAX_COMBUSTIVEL = 100;
+        const CONSUMO_POR_FRAME = 0.05;
+        let asteroides = [];
+        let score = 0;
+        let gameState = 'menu'; 
+        let highScore = 0;
+        let estrelas = [];
+        let currentDifficulty = 'easy';
+        const ROCKET_RADIUS = 15; // Usado para detecção de colisão
 
-        // --- 1. FUNÇÃO DE DESENHO ---
-        function drawRocket() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Variáveis de Controle
+        let keys = {}; // Estado das teclas pressionadas
+        let isBoostActive = false; // Estado do toque/clique (Impulso Extra Contínuo)
+        let animationFrameId; // Para gerenciar o requestAnimationFrame
 
-            // Foguete (Triângulo Simples)
-            ctx.fillStyle = 'red';
+        // Variáveis de Dificuldade
+        let gravidade;
+        let asteroideAbertura; 
+        let velocidadeJogo;
+        let y_thrust;
+        let x_thrust;
+        let max_speed;
+        let drag; 
+        const asteroideLargura = 50;
+
+        // Configurações de Dificuldade (Mantidas do p5.js)
+        const DIFICULDADE_CONFIG = {
+            'easy': { grav: 0.1, abert: 200, y_thrust: -0.7, x_thrust: 0.5, max_speed: 4, scroll_base: 2, drag: 0.98 },
+            'medium': { grav: 0.4, abert: 140, y_thrust: -1.0, x_thrust: 0.8, max_speed: 6, scroll_base: 4, drag: 0.97 },
+            'insane': { grav: 0.8, abert: 100, y_thrust: -1.3, x_thrust: 1.2, max_speed: 8, scroll_base: 7, drag: 0.96 }
+        };
+        
+        // ... (Mensagens Motivacionais omitidas para brevidade, mas devem ser incluídas) ...
+
+        // =========================================================
+        // CLASSE ASTEROIDE (ADAPTADA PARA CANVAS PURO)
+        // =========================================================
+        class Asteroide {
+            constructor() {
+                this.x = WIDTH;
+                this.centroAbertura = Math.random() * (HEIGHT - asteroideAbertura - 60) + asteroideAbertura / 2 + 30;
+                this.topo = this.centroAbertura - asteroideAbertura / 2;
+                this.fundo = this.centroAbertura + asteroideAbertura / 2;
+                this.scored = false; 
+            }
+
+            desenhar() {
+                // Desenha Retângulo Superior
+                ctx.fillStyle = 'rgb(100, 100, 120)';
+                ctx.fillRect(this.x, 0, asteroideLargura, this.topo);
+                
+                // Desenha Retângulo Inferior
+                ctx.fillRect(this.x, this.fundo, asteroideLargura, HEIGHT - this.fundo);
+
+                // Efeito Neon na Abertura (semelhante ao p5.js)
+                if (!this.scored) {
+                    ctx.strokeStyle = 'rgba(255, 200, 0, 0.6)';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x, this.topo);
+                    ctx.lineTo(this.x, this.fundo);
+                    ctx.moveTo(this.x + asteroideLargura, this.topo);
+                    ctx.lineTo(this.x + asteroideLargura, this.fundo);
+                    ctx.stroke();
+                }
+            }
+
+            mover(vel) {
+                this.x -= vel;
+            }
+
+            // Lógica de Colisão (Adaptada para Canvas/Retângulos)
+            checkCollision(fx, fy, fr) {
+                // Colisão Vertical (Teto e Chão)
+                if (fx > this.x && fx < this.x + asteroideLargura) {
+                    if (fy - fr < this.topo || fy + fr > this.fundo) {
+                        return true;
+                    }
+                }
+                // Colisão Horizontal (Bordas de entrada e saída)
+                // Usando a lógica simples de colisão circular com as quinas
+                // Quinas do topo
+                if (Math.hypot(fx - this.x, fy - this.topo) < fr || Math.hypot(fx - (this.x + asteroideLargura), fy - this.topo) < fr) return true;
+                // Quinas do fundo
+                if (Math.hypot(fx - this.x, fy - this.fundo) < fr || Math.hypot(fx - (this.x + asteroideLargura), fy - this.fundo) < fr) return true;
+                
+                return false;
+            }
+        }
+
+        // =========================================================
+        // FUNÇÕES DE JOGO E CONTROLE
+        // =========================================================
+
+        function startGame(difficulty) {
+            currentDifficulty = difficulty;
+            const config = DIFICULDADE_CONFIG[difficulty];
+
+            // Aplica as configurações
+            gravidade = config.grav;
+            asteroideAbertura = config.abert;
+            y_thrust = config.y_thrust;
+            x_thrust = config.x_thrust;
+            max_speed = config.max_speed;
+            drag = config.drag;
+            
+            // Inicializa estado de jogo
+            rocketX = WIDTH / 4; 
+            rocketY = HEIGHT / 2;
+            rocketXVel = 0;
+            rocketYVel = 0;
+            asteroides = [new Asteroide()];
+            score = 0;
+            combustivel = MAX_COMBUSTIVEL;
+            gameState = 'running';
+
+            // Esconde menus, mostra canvas
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('controls-instruction').classList.add('hidden');
+            canvas.style.display = 'block';
+
+            // Inicia o Loop do Jogo
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            gameLoop();
+        }
+
+        function endGame(motivo) {
+            gameState = 'gameover';
+            
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('rocketRunHighScore', highScore);
+            }
+            
+            // Para o loop de animação
+            cancelAnimationFrame(animationFrameId); 
+
+            // Exibe a tela de Game Over HTML
+            document.getElementById('gameover-reason').innerText = motivo;
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('high-score').innerText = highScore;
+            document.getElementById('gameover-screen').classList.remove('hidden');
+            canvas.style.display = 'none'; // Esconde o canvas
+        }
+
+        function showMenu() {
+            gameState = 'menu';
+            document.getElementById('menu-screen').classList.remove('hidden');
+            document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('controls-instruction').classList.remove('hidden');
+            canvas.style.display = 'none';
+        }
+        
+        // --- Loop Principal (requestAnimationFrame) ---
+        function gameLoop() {
+            if (gameState !== 'running') return;
+            
+            // Limpa a tela
+            drawBackground(); 
+
+            // Lógica de Física e Controle (similar ao p5.js, mas com Math.constrain)
+            const highBoostCondition = (keys[' '] || keys[32] || isBoostActive);
+            const anyPlayerAction = (keys['w'] || keys['ArrowUp'] || keys['s'] || keys['ArrowDown'] || keys['a'] || keys['ArrowLeft'] || keys['d'] || keys['ArrowRight'] || highBoostCondition);
+
+            if (highBoostCondition) rocketYVel += y_thrust * 4.0;
+            else if (keys['w'] || keys['ArrowUp']) rocketYVel += y_thrust;
+
+            if (keys['s'] || keys['ArrowDown']) rocketYVel -= y_thrust * 0.5;
+            if (keys['d'] || keys['ArrowRight']) rocketXVel += x_thrust;
+            if (keys['a'] || keys['ArrowLeft']) rocketXVel -= x_thrust;
+
+            // Gravidade e Fricção
+            rocketYVel += gravidade;
+            rocketXVel *= drag;
+            rocketYVel *= drag;
+
+            // Limita Velocidade (Math.min, Math.max)
+            rocketXVel = Math.max(-max_speed, Math.min(max_speed, rocketXVel));
+            rocketYVel = Math.max(-max_speed, Math.min(max_speed, rocketYVel));
+            
+            // Atualiza Posição e Colisão com as Bordas
+            rocketX += rocketXVel;
+            rocketY += rocketYVel;
+            
+            // Colisão com bordas (contrain nativo)
+            rocketX = Math.max(ROCKET_RADIUS, Math.min(WIDTH - ROCKET_RADIUS, rocketX));
+            rocketY = Math.max(ROCKET_RADIUS, Math.min(HEIGHT - ROCKET_RADIUS, rocketY));
+
+            // Velocidade do Mundo (Baseada na posição X do foguete)
+            let xFactor = (rocketX - WIDTH / 4) / (WIDTH - 15 - WIDTH / 4) * 1.5;
+            velocidadeJogo = DIFICULDADE_CONFIG[currentDifficulty].scroll_base + Math.max(0, xFactor);
+
+            // Consumo de Combustível
+            combustivel -= CONSUMO_POR_FRAME * (anyPlayerAction ? 2 : 1);
+            combustivel = Math.max(0, Math.min(MAX_COMBUSTIVEL, combustivel)); 
+            if (combustivel <= 0) { endGame("ACABOU O COMBUSTÍVEL!"); return; }
+
+            // Lógica e Movimento dos Asteroides
+            for (let i = asteroides.length - 1; i >= 0; i--) {
+                asteroides[i].mover(velocidadeJogo);
+                asteroides[i].desenhar();
+
+                if (asteroides[i].checkCollision(rocketX, rocketY, ROCKET_RADIUS)) { 
+                    endGame("COLISÃO COM ASTEROIDE!");
+                    return; 
+                }
+
+                if (asteroides[i].x < -asteroideLargura) {
+                    asteroides.splice(i, 1);
+                }
+                
+                // Pontuação e Recarga
+                if (!asteroides[i].scored && rocketX > asteroides[i].x + asteroideLargura) {
+                    score++; 
+                    combustivel = MAX_COMBUSTIVEL;
+                    asteroides[i].scored = true;
+                    // Lógica de Mensagens Motivacionais (omitida)
+                }
+            }
+
+            // Gera novos asteroides
+            let spawnInterval = Math.max(30, 100 - (velocidadeJogo * 5)); 
+            if (Math.floor(Date.now() / 16.6) % Math.floor(spawnInterval) === 0) { 
+                asteroides.push(new Asteroide());
+            }
+
+            // Desenho
+            drawRocket(rocketX, rocketY, ROCKET_RADIUS * 2);
+            drawHUD();
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // =========================================================
+        // FUNÇÕES DE DESENHO (ADAPTADAS PARA CANVAS PURO)
+        // =========================================================
+
+        function drawBackground() {
+            // Desenha um gradiente de fundo simples
+            const gradient = ctx.createLinearGradient(0, 0, 0, HEIGHT);
+            gradient.addColorStop(0, 'rgb(10, 0, 20)');
+            gradient.addColorStop(1, 'rgb(50, 0, 0)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            
+            // Desenho de Estrelas (Simplificado)
+            ctx.fillStyle = 'white';
+            for (let i = 0; i < estrelas.length; i++) {
+                let star = estrelas[i];
+                star.x -= star.speed * velocidadeJogo * 0.5;
+                if (star.x < 0) {
+                    star.x = WIDTH;
+                    star.y = Math.random() * HEIGHT;
+                }
+                ctx.fillRect(star.x, star.y, star.size, star.size);
+            }
+        }
+
+        function drawRocket(x, y, tamanho) {
+            // CÁLCULO DE ROTAÇÃO (Pitch)
+            const rotationAngle = (rocketYVel / max_speed) * (Math.PI / 8); // Máximo +/- 22.5 graus
+
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(rotationAngle);
+            
+            // Rastro de Propulsão (se boost ativo)
+            if (isBoostActive || keys['w'] || keys['ArrowUp'] || keys[' '] || keys[32]) {
+                ctx.fillStyle = 'orange';
+                ctx.beginPath();
+                // Fogo: Triângulo atrás do corpo principal
+                ctx.moveTo(-tamanho/2, 0);
+                ctx.lineTo(-tamanho/2 - 5 - Math.random() * 5, -5 - Math.random() * 2);
+                ctx.lineTo(-tamanho/2 - 5 - Math.random() * 5, 5 + Math.random() * 2);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // Corpo do Foguete (Triângulo)
+            ctx.fillStyle = 'rgb(180, 180, 180)';
             ctx.beginPath();
-            ctx.moveTo(canvas.width / 4, rocketY - 15);
-            ctx.lineTo(canvas.width / 4 - 10, rocketY + 15);
-            ctx.lineTo(canvas.width / 4 + 10, rocketY + 15);
+            ctx.moveTo(tamanho/2, 0); // Ponta
+            ctx.lineTo(-tamanho/2, -tamanho/2); // Asa superior
+            ctx.lineTo(-tamanho/2, tamanho/2); // Asa inferior
             ctx.closePath();
             ctx.fill();
-
-            // Chamas de Propulsão (se estiver tocando)
-            if (isTouching) {
-                ctx.fillStyle = 'orange';
-                ctx.fillRect(canvas.width / 4 - 5, rocketY + 15, 10, 10);
-            }
-        }
-
-        // --- 2. LOOP PRINCIPAL DO JOGO ---
-        function gameLoop() {
-            // Aplica Impulso se tocando
-            if (isTouching) {
-                yVelocity += thrust;
-            }
-
-            // Aplica Gravidade
-            yVelocity += gravity;
-
-            // Atualiza Posição
-            rocketY += yVelocity;
-
-            // Colisão com o chão/teto (Limita)
-            if (rocketY > canvas.height - 15) {
-                rocketY = canvas.height - 15;
-                yVelocity = 0;
-            } else if (rocketY < 15) {
-                rocketY = 15;
-                yVelocity = 0;
-            }
-
-            drawRocket();
-            requestAnimationFrame(gameLoop); // Loop nativo
-        }
-
-        // --- 3. CONTROLE DE TOQUE PURO ---
-
-        // Função para impedir o comportamento padrão e registrar o toque
-        function handleTouch(event) {
-            // ESTE É O BLOQUEIO CRÍTICO. 
-            // O navegador não pode rolar ou fazer zoom.
-            event.preventDefault(); 
             
-            // Verifica se o toque começou (touchstart) ou se o mouse está pressionado
-            if (event.type === 'touchstart' || event.type === 'mousedown') {
-                isTouching = true;
+            // Ponta Vermelha
+            ctx.fillStyle = 'rgb(200, 50, 50)';
+            ctx.beginPath();
+            ctx.arc(tamanho/2 - 3, 0, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawHUD() {
+            ctx.save();
+            ctx.textAlign = 'center';
+            
+            // TÍTULO
+            ctx.font = '20px Arial';
+            ctx.fillStyle = 'white';
+            ctx.fillText("FOGUETE EM FUGA", WIDTH / 2, 25);
+            
+            // PONTUAÇÃO
+            ctx.textAlign = 'right';
+            ctx.font = '24px Arial';
+            ctx.fillStyle = 'rgb(255, 200, 0)';
+            ctx.fillText(`SCORE: ${score}`, WIDTH - 20, 40);
+            
+            // RECORDE
+            ctx.font = '18px Arial';
+            ctx.fillStyle = 'white';
+            ctx.fillText(`RECORD: ${highScore}`, WIDTH - 20, 65);
+
+            // COMBUSTÍVEL
+            ctx.textAlign = 'left';
+            drawFuelGauge(20, 80, 15, 200);
+
+            ctx.restore();
+        }
+
+        function drawFuelGauge(x, y, h, w) {
+            // Fundo da barra
+            ctx.fillStyle = 'rgb(50, 50, 50)';
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 1;
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeRect(x, y, w, h); 
+            
+            // Barra de Combustível
+            let fuelWidth = (combustivel / MAX_COMBUSTIVEL) * w;
+            let fuelColor = combustivel < 20 ? 'red' : combustivel < 50 ? 'yellow' : 'green';
+            ctx.fillStyle = fuelColor;
+            ctx.fillRect(x + 1, y + 1, fuelWidth - 2, h - 2);
+
+            ctx.font = '14px Arial';
+            ctx.fillStyle = 'white';
+            ctx.fillText("COMBUSTÍVEL", x, y - 5);
+        }
+
+        // =========================================================
+        // FUNÇÕES DE EVENTOS (CONTROLE MÁXIMO)
+        // =========================================================
+
+        // Bloqueio Crítico do Toque e Estado de Boost
+        function handleTouch(event) {
+            event.preventDefault(); // BLOQUEIO MÁXIMO
+            
+            if (event.type.includes('start') || event.type === 'mousedown') {
+                isBoostActive = true;
+                if (gameState === 'gameover') showMenu();
             } 
-            // Verifica se o toque terminou (touchend) ou se o mouse foi solto
-            else if (event.type === 'touchend' || event.type === 'mouseup') {
-                isTouching = false;
+            else if (event.type.includes('end') || event.type === 'mouseup') {
+                isBoostActive = false;
             }
         }
 
-        // Adiciona listeners de TOQUE (para celular)
+        // Teclado
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            if (gameState === 'gameover' && e.key === ' ') showMenu();
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // Event Listeners MÓVEIS (A prova de falhas)
         canvas.addEventListener('touchstart', handleTouch, { passive: false });
         canvas.addEventListener('touchend', handleTouch, { passive: false });
-
-        // Adiciona listeners de MOUSE (para desktop)
         canvas.addEventListener('mousedown', handleTouch, false);
         canvas.addEventListener('mouseup', handleTouch, false);
         
-        // Inicia o jogo
-        requestAnimationFrame(gameLoop);
+        // Inicialização de Estrelas e High Score
+        for(let i = 0; i < 150; i++) {
+            estrelas.push({ 
+                x: Math.random() * WIDTH, 
+                y: Math.random() * HEIGHT, 
+                size: Math.random() * 2 + 1, 
+                speed: Math.random() * 1.5 + 0.5 
+            });
+        }
+        let savedScore = localStorage.getItem('rocketRunHighScore');
+        if (savedScore !== null) highScore = parseInt(savedScore);
+
+        // Início (Mostra o Menu)
+        showMenu();
+
     </script>
 </body>
 </html>
