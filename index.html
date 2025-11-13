@@ -3,140 +3,205 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rocket Run Pro - FIX FINAL</title>
+    <title>Rocket Run Pro: Mestre do Espaço</title>
+    <!-- P5.JS 1.9.4 - CORRIGE BUGS DE TOUCH NO ANDROID -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.js"></script>
     <style>
-        body, html { margin:0; padding:0; overflow:hidden; background:#000; touch-action:none; user-select:none; }
-        canvas { display:block; margin:auto; border:3px solid #0f0; border-radius:12px; }
-        #debug {
-            position:fixed; top:10px; left:10px; background:rgba(0,0,0,0.8); color:#0f0;
-            font:0.9rem monospace; padding:10px; border-radius:8px; z-index:999; border:1px solid #0f0;
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            background: #0a0014;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
         }
-        #start {
-            position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(10,0,20,0.98);
-            display:flex; flex-direction:column; justify-content:center; align-items:center; color:white; z-index:1000;
+        canvas {
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(255,50,50,0.5);
+            touch-action: none;
         }
-        .btn { margin:10px; padding:18px 40px; font-size:1.3rem; font-weight:bold; border:none; border-radius:12px; cursor:pointer; }
-        .easy { background:#00A389; color:white; }
-        .medium { background:#ffc107; color:#333; }
-        .insane { background:#F44336; color:white; }
+        #menu, #gameover {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            z-index: 100;
+            color: white;
+        }
+        #menu h1, #gameover h1 { color: #ff9900; font-size: 2.5rem; margin-bottom: 20px; }
+        .btn {
+            display: block;
+            width: 260px;
+            margin: 12px auto;
+            padding: 16px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn:active { transform: scale(0.98); }
+        .easy { background: #00A389; color: white; }
+        .medium { background: #ffc107; color: #333; }
+        .insane { background: #F44336; color: white; }
+        #gameover h2 { color: #F44336; margin: 15px 0; }
+        .score { color: #ccc; font-size: 1.3rem; margin: 10px 0; }
+        .score span { color: #ffc107; font-size: 1.6rem; font-weight: bold; }
+        .hidden { display: none; }
+        #hint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            padding: 12px 25px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #ffcc00;
+            z-index: 10;
+        }
     </style>
 </head>
 <body>
 
-<div id="start">
+<!-- MENU -->
+<div id="menu">
     <h1>ROCKET RUN PRO</h1>
-    <div class="btn easy" onclick="start('easy')">FÁCIL</div>
-    <div class="btn medium" onclick="start('medium')">MÉDIO</div>
-    <div class="btn insane" onclick="start('insane')">LOCO</div>
-    <p style="margin-top:30px; color:#ffcc00;">TOQUE NA TELA PARA SUBIR</p>
+    <p>TOQUE NA TELA PARA SUBIR</p>
+    <button class="btn easy" onclick="start('easy')">FÁCIL</button>
+    <button class="btn medium" onclick="start('medium')">MÉDIO</button>
+    <button class="btn insane" onclick="start('insane')">LOCO</button>
 </div>
 
-<div id="debug">Carregando...</div>
+<!-- GAME OVER -->
+<div id="gameover" class="hidden">
+    <h1>MISSÃO FALHOU</h1>
+    <h2 id="reason"></h2>
+    <div class="score">Pontuação: <span id="final">0</span></div>
+    <div class="score">Recorde: <span id="best">0</span></div>
+    <button class="btn easy" onclick="showMenu()">REINICIAR</button>
+</div>
+
+<div id="hint">TOQUE NA TELA PARA SUBIR</div>
 
 <script>
-    let canvas, rocket = {x:0, y:0, vx:0, vy:0}, fuel = 100, score = 0, high = 0;
-    let asteroids = [], stars = [], state = 'menu', diff = 'easy';
-    let isThrust = false, debugCount = 0;
+    // === CONFIGURAÇÕES ===
+    let canvas, rocket = {}, fuel = 100, score = 0, high = 0, asteroids = [], stars = [];
+    let state = 'menu', diff = 'easy', thrustActive = false;
+    let g, gap, thrust, xth, max, speed, drag;
 
     const CFG = {
-        easy:   {g:0.1, gap:200, thrust:-0.7, max:4, base:2, drag:0.98},
-        medium: {g:0.4, gap:140, thrust:-1.0, max:6, base:4, drag:0.97},
-        insane: {g:0.8, gap:100, thrust:-1.3, max:8, base:7, drag:0.96}
+        easy:   {g:0.1, gap:200, thrust:-0.7, xth:0.5, max:4, speed:2, drag:0.98},
+        medium: {g:0.4, gap:140, thrust:-1.0, xth:0.8, max:6, speed:4, drag:0.97},
+        insane: {g:0.8, gap:100, thrust:-1.3, xth:1.2, max:8, speed:7, drag:0.96}
     };
 
+    // === INICIAR JOGO ===
     function start(d) {
         diff = d;
         const c = CFG[d];
-        Object.assign(window, {g:c.g, gap:c.gap, thrust:c.thrust, max:c.max, speed:c.base, drag:c.drag});
+        g = c.g; gap = c.gap; thrust = c.thrust; xth = c.xth; max = c.max; speed = c.speed; drag = c.drag;
 
-        let w = min(800, windowWidth-20), h = min(450, windowHeight-100);
+        let w = Math.min(800, windowWidth - 20);
+        let h = Math.min(450, windowHeight - 100);
         canvas = createCanvas(w, h);
         canvas.parent(document.body);
-        document.getElementById('start').remove();
 
-        rocket = {x: w/4, y: h/2, vx:0, vy:0};
+        rocket = { x: w/4, y: h/2, vx: 0, vy: 0 };
         fuel = 100; score = 0; asteroids = [new Asteroid()];
-        for(let i=0;i<150;i++) stars.push({x:random(w),y:random(h),s:random(1,3),v:random(0.5,2)});
+        for (let i = 0; i < 150; i++) stars.push({ x: random(w), y: random(h), s: random(1,3), v: random(0.5,2) });
 
+        document.getElementById('menu').classList.add('hidden');
+        document.getElementById('hint').classList.add('hidden');
         state = 'play';
         loop();
-        updateDebug('JOGO INICIADO');
     }
 
+    // === SETUP ===
     function setup() {
         noLoop();
-        updateDebug('setup OK');
+        high = parseInt(localStorage.getItem('rrhs') || 0);
     }
 
+    // === LOOP PRINCIPAL ===
     function draw() {
         if (state !== 'play') return;
 
-        clear();
         background(10, 0, 20);
+        drawStars();
 
-        // === TOQUE ATIVO? ===
-        isThrust = mouseIsPressed || (touches && touches.length > 0);
+        // === TOQUE / CLIQUE ===
+        thrustActive = mouseIsPressed || (touches && touches.length > 0);
 
         // === FÍSICA ===
-        if (isThrust) rocket.vy += thrust * 2.8;
+        if (thrustActive) rocket.vy += thrust * 3.5;
         rocket.vy += g;
         rocket.vx *= drag; rocket.vy *= drag;
         rocket.vx = constrain(rocket.vx, -max, max);
         rocket.vy = constrain(rocket.vy, -max, max);
         rocket.x += rocket.vx; rocket.y += rocket.vy;
-        rocket.x = constrain(rocket.x, 20, width-20);
-        rocket.y = constrain(rocket.y, 20, height-20);
+        rocket.x = constrain(rocket.x, 20, width - 20);
+        rocket.y = constrain(rocket.y, 20, height - 20);
 
-        fuel -= 0.05 * (isThrust ? 2 : 1);
-        if (fuel <= 0) gameOver("SEM COMBUSTÍVEL");
+        fuel -= 0.05 * (thrustActive ? 2 : 1);
+        if (fuel <= 0) end("SEM COMBUSTÍVEL");
 
-        // === DESENHO ===
-        drawStars();
         drawRocket();
         updateAsteroids();
         drawHUD();
-
-        updateDebug(`Thrust: ${isThrust} | Vy: ${rocket.vy.toFixed(2)} | Y: ${floor(rocket.y)}`);
     }
 
+    // === DESENHO DO FOGUETE ===
     function drawRocket() {
         push();
         translate(rocket.x, rocket.y);
         rotate(map(rocket.vy, -max, max, -0.3, 0.3));
-        if (isThrust) { fill(255,150,0,220); ellipse(-20,0,16,26); }
-        fill(180); triangle(-15,-15,-15,15,15,0);
-        fill(200,50,50); triangle(15,0,10,-5,10,5);
+        if (thrustActive) { fill(255,150,0,220); ellipse(-22,0,16,28); }
+        fill(180); triangle(-16,-16,-16,16,16,0);
+        fill(200,50,50); triangle(16,0,10,-6,10,6);
         pop();
     }
 
+    // === ESTRELAS ===
     function drawStars() {
         fill(255);
-        for(let s of stars) {
+        for (let s of stars) {
             s.x -= s.v * speed * 0.5;
-            if(s.x < 0) s.x = width;
+            if (s.x < 0) s.x = width;
             ellipse(s.x, s.y, s.s);
         }
     }
 
+    // === ASTEROIDES ===
     function updateAsteroids() {
-        for(let i=asteroids.length-1; i>=0; i--) {
+        for (let i = asteroids.length - 1; i >= 0; i--) {
             let a = asteroids[i];
             a.x -= speed;
             fill(100,50,50); stroke(200,50,50); strokeWeight(2);
             rect(a.x, 0, 50, a.top);
-            rect(a.x, a.bottom, 50, height-a.bottom);
-            if (dist(rocket.x, rocket.y, a.x+25, a.center) < 40 && (rocket.y < a.top || rocket.y > a.bottom)) {
-                gameOver("COLISÃO!");
+            rect(a.x, a.bottom, 50, height - a.bottom);
+
+            if (dist(rocket.x, rocket.y, a.x + 25, a.center) < 40 && (rocket.y < a.top || rocket.y > a.bottom)) {
+                end("COLISÃO!");
             }
             if (a.x < -60) {
                 score++; fuel = 100;
-                asteroids.splice(i,1);
+                asteroids.splice(i, 1);
                 asteroids.push(new Asteroid());
             }
         }
     }
 
+    // === HUD ===
     function drawHUD() {
         fill(255); textSize(20); textAlign(LEFT);
         text(`SCORE: ${score}`, 20, 30);
@@ -144,43 +209,45 @@
         fill(0,200,0); rect(20, 80, map(fuel,0,100,0,200), 15);
     }
 
-    function gameOver(msg) {
+    // === FIM DE JOGO ===
+    function end(msg) {
         state = 'over';
         if (score > high) { high = score; localStorage.setItem('rrhs', high); }
         noLoop();
-        setTimeout(() => alert(`${msg}\nPontuação: ${score}\nRecorde: ${high}`), 100);
-        setTimeout(() => location.reload(), 2000);
+        document.getElementById('reason').innerText = msg;
+        document.getElementById('final').innerText = score;
+        document.getElementById('best').innerText = high;
+        document.getElementById('gameover').classList.remove('hidden');
     }
 
+    function showMenu() {
+        document.getElementById('gameover').classList.add('hidden');
+        document.getElementById('menu').classList.remove('hidden');
+        document.getElementById('hint').classList.remove('hidden');
+        state = 'menu';
+    }
+
+    // === CLASSE ASTEROIDE ===
     class Asteroid {
         constructor() {
-            this.center = random(100, height-100);
-            this.gap = gap/2;
+            this.center = random(100, height - 100);
+            this.gap = gap / 2;
             this.top = this.center - this.gap;
             this.bottom = this.center + this.gap;
             this.x = width;
         }
     }
 
-    function updateDebug(msg) {
-        debugCount++;
-        document.getElementById('debug').innerHTML = `
-            Eventos: ${debugCount}<br>
-            Estado: ${state}<br>
-            ${msg}
-        `;
-    }
-
-    // === EVENTOS GLOBAIS ===
-    function touchStarted() { if(state==='play') isThrust=true; return false; }
-    function touchEnded() { if(state==='play') isThrust=false; return false; }
+    // === EVENTOS DE TOQUE (100% FUNCIONAIS NO CELULAR) ===
+    function touchStarted() { if (state === 'play') thrustActive = true; return false; }
+    function touchEnded() { if (state === 'play') thrustActive = false; return false; }
     function mousePressed() { return touchStarted(); }
     function mouseReleased() { return touchEnded(); }
 
-    document.addEventListener('touchstart', e=>e.preventDefault(), {passive:false});
-    document.addEventListener('touchmove', e=>e.preventDefault(), {passive:false});
-
-    high = parseInt(localStorage.getItem('rrhs')||0);
+    // === PREVENIR ZOOM/SCROLL NO CELULAR ===
+    document.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+    document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+    document.addEventListener('contextmenu', e => e.preventDefault());
 </script>
 </body>
 </html>
