@@ -2,13 +2,10 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <!-- Viewport otimizado para mobile -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Rocket Run Pro: Mestre do Espaço</title>
-    <!-- Carrega a biblioteca P5.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <style>
-        /* Estilos básicos para centralizar o canvas e torná-lo responsivo */
         body {
             display: flex;
             justify-content: center;
@@ -19,20 +16,20 @@
             font-family: Arial, sans-serif;
             color: white;
             overflow: hidden;
-            /* Permite toque nos botões, mas evita scroll/zoom indesejado no jogo */
             touch-action: manipulation;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
         }
         canvas {
             display: block;
             border-radius: 12px;
             box-shadow: 0 0 30px rgba(255, 50, 50, 0.5);
             cursor: pointer;
-            /* Canvas recebe toques, mas não interfere com botões */
             touch-action: none;
             position: relative;
             z-index: 50;
         }
-        /* Estilos para o menu de dificuldade e Game Over */
         .menu-container, .game-over-container {
             position: absolute;
             top: 50%;
@@ -44,7 +41,6 @@
             box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
             text-align: center;
             z-index: 100;
-            /* Garante que botões respondam ao toque */
             touch-action: manipulation;
         }
         .menu-container h1, .game-over-container h1 {
@@ -98,10 +94,13 @@
             z-index: 10;
             touch-action: manipulation;
         }
+        /* Força o canvas a receber eventos de toque */
+        canvas {
+            -webkit-tap-highlight-color: transparent;
+        }
     </style>
 </head>
 <body>
-    <!-- Menu de Dificuldade -->
     <div id="menu-screen" class="menu-container">
         <h1>ROCKET RUN PRO</h1>
         <p>SELECIONE O NÍVEL DE DIFICULDADE</p>
@@ -109,7 +108,6 @@
         <button class="difficulty-button medium" onclick="startGame('medium')">MÉDIO</button>
         <button class="difficulty-button insane" onclick="startGame('insane')">ESTOU LOUCO (só para loucos)</button>
     </div>
-    <!-- Tela de Game Over -->
     <div id="gameover-screen" class="game-over-container hidden">
         <h1>MISSÃO FALHOU</h1>
         <h2 id="gameover-reason"></h2>
@@ -122,11 +120,11 @@
         <button class="restart-button easy" onclick="showMenu()">REINICIAR</button>
     </div>
     <div id="controls-instruction">
-        Controles: WASD ou SETAS (Mover), Clique/Toque/ESPAÇO (Impulso Extra Contínuo)
+        Controles: Toque na tela para subir (impulso contínuo) | Solte para descer
     </div>
 
     <script>
-        // === VARIÁVEIS GLOBAIS (IDÊNTICAS) ===
+        // === VARIÁVEIS GLOBAIS ===
         let rocketX, rocketY, rocketXVel = 0, rocketYVel = 0;
         let combustivel;
         const MAX_COMBUSTIVEL = 100;
@@ -141,7 +139,7 @@
         const AUTOPILOT_DELAY = 120;
         let gravidade, asteroideAbertura, velocidadeJogo, y_thrust, x_thrust, max_speed, drag;
 
-        const MENSAGENS_MOTIVACIONAIS = [ /* ... 40 mensagens (mantidas) ... */ 
+        const MENSAGENS_MOTIVACIONAIS = [
             "Uau! Você é um ás da pilotagem! Avance para o próximo setor.",
             "Impecável! Seu histórico de voo é perfeito. Continue assim!",
             "Setor de Meio de Jogo: Você é imparável. A lenda diz que poucos chegam aqui!",
@@ -199,11 +197,13 @@
             let canvas = createCanvas(w, h);
             canvas.parent(document.body);
 
-            // Previne menu de contexto e comportamento padrão
+            // Força eventos de toque no canvas
             canvas.elt.addEventListener('contextmenu', e => e.preventDefault());
             canvas.elt.style.touchAction = 'none';
+            canvas.elt.addEventListener('touchstart', e => { e.preventDefault(); }, { passive: false });
+            canvas.elt.addEventListener('touchmove', e => { e.preventDefault(); }, { passive: false });
+            canvas.elt.addEventListener('touchend', e => { e.preventDefault(); }, { passive: false });
 
-            // Carrega recorde
             let savedScore = localStorage.getItem('rocketRunHighScore');
             if (savedScore !== null) highScore = parseInt(savedScore);
 
@@ -212,7 +212,6 @@
             noStroke();
             frameRate(60);
 
-            // Estrelas
             for (let i = 0; i < 150; i++) {
                 estrelas.push({ x: random(width), y: random(height), size: random(1, 3), speed: random(0.5, 2) });
             }
@@ -263,7 +262,7 @@
         }
 
         // =========================================================
-        // DRAW (PRINCIPAL)
+        // DRAW
         // =========================================================
         function draw() {
             if (gameState === 'menu') {
@@ -272,12 +271,11 @@
                 return;
             }
 
-            drawBackgroundBackgroundGradient();
+            drawBackgroundGradient();
             drawStars();
 
             if (gameState === 'running') {
-                // --- CONTROLES (ALTERADO PARA MOBILE/PC) ---
-                const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+                // === CONTROLES ===
                 const highBoostCondition = (keys[' '] || keys[32] || isBoostActive);
 
                 if (highBoostCondition) {
@@ -298,7 +296,7 @@
                     rocketXVel -= x_thrust;
                 }
 
-                // Autopilot (apenas fácil)
+                // Autopilot
                 let anyPlayerAction = (keys['w'] || keys['W'] || keys['ArrowUp'] || keys['s'] || keys['S'] || keys['ArrowDown'] || keys['a'] || keys['A'] || rightThrustApplied || highBoostCondition);
                 if (currentDifficulty === 'easy') {
                     if (anyPlayerAction) {
@@ -312,7 +310,7 @@
                     }
                 }
 
-                // --- FÍSICA ---
+                // === FÍSICA ===
                 rocketYVel += gravidade;
                 rocketXVel *= drag;
                 rocketYVel *= drag;
@@ -376,7 +374,7 @@
         }
 
         // =========================================================
-        // INPUTS (TOQUE + TECLADO + MOUSE)
+        // INPUTS
         // =========================================================
         function keyPressed() {
             if (gameState === 'running') {
@@ -404,19 +402,24 @@
         }
 
         function touchStarted() {
-            // Toque no canvas = impulso
-            if (gameState === 'running') isBoostActive = true;
-            if (gameState === 'gameover') showMenu();
+            if (gameState === 'running') {
+                isBoostActive = true;
+            }
+            if (gameState === 'gameover') {
+                showMenu();
+            }
             return false;
         }
 
         function touchEnded() {
-            if (gameState === 'running') isBoostActive = false;
+            if (gameState === 'running') {
+                isBoostActive = false;
+            }
             return false;
         }
 
         // =========================================================
-        // RESTANTE (IDÊNTICO)
+        // FUNÇÕES AUXILIARES
         // =========================================================
         function windowResized() {
             let w = min(800, windowWidth);
@@ -485,7 +488,7 @@
             pop();
         }
 
-        function drawHUD() { /* ... (mantido idêntico) ... */ 
+        function drawHUD() {
             push();
             textSize(20 * (width / 800));
             fill(255, 255, 255);
@@ -508,7 +511,7 @@
             pop();
         }
 
-        function drawFuelGauge(x, y, h, w) { /* ... (mantido idêntico) ... */ 
+        function drawFuelGauge(x, y, h, w) {
             push();
             textSize(14 * (width / 800));
             fill(255);
@@ -525,7 +528,7 @@
             pop();
         }
 
-        function desenharFoguete(x, y, tamanho) { /* ... (mantido idêntico) ... */ 
+        function desenharFoguete(x, y, tamanho) {
             push();
             let rastroAlpha = map(combustivel, 0, MAX_COMBUSTIVEL, 50, 255);
             let rotationAngle = map(rocketYVel, -max_speed, max_speed, radians(-20), radians(20));
